@@ -358,7 +358,7 @@ private fun VideoPage(item: MediaItem, isCurrent: Boolean, bars: Boolean, onTap:
     val scope = rememberCoroutineScope()
     LaunchedEffect(isCurrent) { if (!isCurrent) z.reset() }
 
-    Box(Modifier.fillMaxSize().zoomGestures(z, scope, onTap), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().zoomGestures(z, scope, onTap = onTap), contentAlignment = Alignment.Center) {
         ZoomBadge(z, modifier = Modifier.align(Alignment.Center))
         if (playing) {
             VideoPlayer(item, z, bars, setBars)
