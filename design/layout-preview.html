@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M Photo</title>
+<style>
+:root{
+  --chrome:#1F2126;--panel:#26292F;--line:#363A42;--hover:#2F333A;--stage:#2B2D31;
+  --text:#E8E9EC;--muted:#8D929C;--red:#E5383B;--warn:#F2B84B;--selected-bg:#3A2426;--green:#3DDC8A;
+  --ease-out:cubic-bezier(.22,1,.36,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--t-fast:.12s;--t-med:.22s;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#15161A;color:var(--text);font:14px/1.4 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button,.card,.row,.chip{transition:background-color var(--t-fast) ease,border-color var(--t-fast) ease,color var(--t-fast) ease,box-shadow var(--t-med) var(--ease-out),transform var(--t-med) var(--ease-out),opacity var(--t-fast) ease}
+button:not(:disabled):active{transform:scale(.95);transition-duration:.06s}
+:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+/* ---------- preview page chrome ---------- */
+.page{padding:18px 16px 40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.ptitle{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.ptitle img{width:34px;height:34px}
+.ptitle .m{color:var(--red)}
+.pnote{color:var(--muted);font-size:13px;text-align:center;max-width:760px}
+.seg{display:flex;background:var(--panel);border-radius:10px;padding:3px;gap:2px}
+.seg button{padding:7px 14px;border-radius:8px;color:var(--muted);font-weight:600;font-size:13px}
+.seg button.on{background:var(--selected-bg);color:#fff;box-shadow:inset 0 0 0 1px var(--red)}
+.stage{display:flex;gap:28px;align-items:flex-start;justify-content:center;flex-wrap:wrap;width:100%}
+.devwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.devlabel{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em}
+.scaler{transform-origin:top left}
+.device{background:#000;border-radius:34px;padding:9px;box-shadow:0 0 0 2px #2c2e34,0 20px 50px rgba(0,0,0,.5)}
+.screen{position:relative;overflow:hidden;border-radius:26px;background:var(--chrome)}
+.dev-outer .screen{width:384px;height:896px}
+.dev-inner .screen{width:820px;height:740px}
+.dev-inner .device{border-radius:30px}
+.statusbar{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:#cfd2d8}
+.statusbar .cam{width:10px;height:10px;border-radius:50%;background:#000;box-shadow:0 0 0 2px #222}
+
+/* ---------- app ---------- */
+.app{position:absolute;inset:28px 0 0 0;display:flex;flex-direction:column;background:var(--chrome)}
+.app.expanded{flex-direction:row}
+.topbar{height:52px;display:flex;align-items:center;gap:2px;padding:0 6px 0 14px;flex:0 0 auto}
+.topbar .title{flex:1;min-width:0;font-size:19px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.ibtn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#cfd2d8;flex:0 0 auto}
+.ibtn:hover{background:var(--hover)}
+.upd{display:flex;align-items:center;gap:2px}
+.upd.spin svg{animation:spin .8s linear infinite}
+.upd.ok{color:var(--green)}
+.upd.new{color:var(--green);animation:pulse 1.2s ease-in-out infinite}
+.latest{font-size:10.5px;font-weight:800;color:#2EB872;background:#2eb87224;padding:1px 7px;border-radius:20px;animation:pop .32s var(--ease-spring)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{50%{opacity:.45}}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.crumbs{display:flex;align-items:center;gap:2px;padding:0 10px 8px;overflow-x:auto;scrollbar-width:none;flex:0 0 auto}
+.crumbs::-webkit-scrollbar{display:none}
+.crumb{padding:5px 9px;border-radius:14px;font-size:12.5px;color:var(--muted);white-space:nowrap;font-weight:600}
+.crumb.cur{color:#fff;background:var(--panel)}
+.crumbs .sep{color:#555a64;font-size:12px}
+.body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3e46 transparent;padding:0 10px 90px}
+.sect{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin:12px 6px 8px;display:flex;align-items:center;gap:6px}
+.sect svg{width:14px;height:14px}
+.grid{display:grid;grid-template-columns:repeat(var(--cols,2),1fr);gap:12px}
+.card{position:relative;text-align:left;border-radius:16px;padding:0;user-select:none;-webkit-user-select:none}
+.card .cover{aspect-ratio:1;border-radius:16px;overflow:hidden;position:relative;background:var(--panel)}
+.card .cover .t{position:absolute;inset:0}
+.card .cover.multi{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:2px}
+.card .cover.multi .t{position:static}
+.card .cover.multi .t:first-child{grid-row:span 2}
+.card .nm{margin:7px 4px 0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+.card .ct{margin:1px 4px 0;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.card:hover .cover{box-shadow:0 0 0 2px var(--red)}
+.card.sel .cover{box-shadow:0 0 0 2px var(--red)}
+.badge{position:absolute;top:7px;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
+.badge.star{left:7px;color:#FFC93C}
+.badge.hid{right:7px;color:#fff}
+.badge svg{width:15px;height:15px}
+.badge.star svg{fill:#FFC93C;stroke:#FFC93C}
+.more{position:absolute;right:0;bottom:16px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.more svg{width:18px;height:18px}
+.card.dim{opacity:.55}
+
+.row{display:flex;align-items:center;gap:12px;width:100%;padding:8px 6px;border-radius:12px;text-align:left;user-select:none;-webkit-user-select:none}
+.row:hover{background:var(--panel);box-shadow:inset 3px 0 0 var(--red);transform:translateX(3px)}
+.row.sel{background:var(--selected-bg);box-shadow:inset 3px 0 0 var(--red)}
+.row .fic{width:52px;height:52px;border-radius:12px;position:relative;overflow:hidden;flex:0 0 auto;background:var(--panel);display:grid;place-items:center;color:#FFC93C}
+.row .fic .t{position:absolute;inset:0}
+.row .fic .fold{position:absolute;right:3px;bottom:3px;width:20px;height:20px;border-radius:6px;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff}
+.row .fic .fold svg{width:13px;height:13px}
+.row .tx{flex:1;min-width:0}
+.row .tx b{display:flex;align-items:center;gap:5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .tx span{color:var(--muted);font-size:12px}
+.row .chev{color:#5d626c}
+.row .tx b svg{width:14px;height:14px}
+.star-s{color:#FFC93C;fill:#FFC93C}
+
+.photos{display:grid;grid-template-columns:repeat(var(--pcols,4),1fr);gap:2px;margin:0 -10px}
+.ph{aspect-ratio:1;position:relative;overflow:hidden;cursor:pointer;padding:0;border-radius:0}
+.ph .t{position:absolute;inset:0;transition:transform var(--t-med) var(--ease-out)}
+.ph:hover .t{transform:scale(1.04)}
+.ph .dur{position:absolute;right:5px;bottom:4px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:3px;text-shadow:0 1px 3px #000}
+.ph .dur svg{width:12px;height:12px;fill:#fff;stroke:none}
+
+.nav{position:absolute;left:0;right:0;bottom:0;height:64px;background:rgba(31,33,38,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;align-items:stretch;z-index:5}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);position:relative}
+.nav button.on{color:#fff}
+.nav button.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:2px;background:var(--red);border-radius:2px}
+.nav button.on svg{color:var(--red)}
+.credit{position:absolute;right:10px;bottom:70px;font-size:10.5px;color:#7B808A;z-index:4;pointer-events:none;background:rgba(31,33,38,.85);padding:2px 8px;border-radius:10px;backdrop-filter:blur(6px)}
+.expanded .credit{bottom:8px}
+
+/* expanded */
+.rail{width:76px;background:var(--chrome);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px;flex:0 0 auto}
+.rail button{width:60px;padding:8px 0;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--muted)}
+.rail button.on{color:#fff;background:var(--selected-bg)}
+.rail button.on svg{color:var(--red)}
+.rail button:hover{color:#fff}
+.listpane{width:330px;flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--line);position:relative;min-height:0}
+.detail{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--stage);position:relative;min-height:0}
+.detail .body,.listpane .body{padding-bottom:30px}
+.empty{flex:1;display:grid;place-items:center;text-align:center;color:var(--muted)}
+.empty h3{color:var(--text);font-size:20px;margin:10px 0 4px}
+
+/* settings */
+.group{background:var(--panel);border-radius:16px;margin:0 0 14px;overflow:hidden}
+.gtitle{font-size:12px;font-weight:700;color:var(--red);letter-spacing:.05em;text-transform:uppercase;margin:16px 8px 8px}
+.item{display:flex;align-items:center;gap:12px;padding:13px 14px;width:100%;text-align:left;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item:hover{background:var(--hover)}
+.item .tx{flex:1;min-width:0}
+.item .tx b{display:block;font-weight:600}
+.item .tx span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item>svg{color:var(--muted)}
+.sw{width:42px;height:24px;border-radius:12px;background:#474C55;position:relative;flex:0 0 auto;transition:background-color var(--t-med)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform var(--t-med) var(--ease-spring)}
+.sw.on{background:var(--red)}
+.sw.on::after{transform:translateX(18px)}
+.rule{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;border-bottom:1px solid var(--line)}
+.rule:last-child{border-bottom:0}
+.rule .p{flex:1;min-width:0;font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rule .p small{display:block;font-family:"Segoe UI",system-ui,sans-serif;color:var(--muted);font-size:11px}
+.chip{padding:4px 10px;border-radius:14px;font-size:11.5px;font-weight:700;border:1px solid var(--line);white-space:nowrap}
+.chip.ex{color:#FF8A8C;border-color:#5a2a2c;background:rgba(229,56,59,.12)}
+.chip.in{color:var(--green);border-color:#1f5a3c;background:rgba(61,220,138,.1)}
+.chip:hover{transform:translateY(-1px)}
+.addbtn{display:flex;align-items:center;gap:8px;color:var(--red);font-weight:700;padding:12px 14px;width:100%}
+.ver{font-variant-numeric:tabular-nums;color:var(--muted)}
+
+/* sheets / dialogs */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:20;animation:fade .2s ease;display:flex;align-items:flex-end;justify-content:center}
+.scrim.center{align-items:center}
+@keyframes fade{from{opacity:0}}
+.sheet{width:100%;max-width:520px;background:var(--panel);border-radius:22px 22px 0 0;padding:8px 8px 18px;animation:up .32s var(--ease-out)}
+.expanded .sheet{border-radius:22px;margin-bottom:16px}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.grab{width:38px;height:4px;border-radius:2px;background:#4a4e57;margin:2px auto 10px}
+.shead{display:flex;align-items:center;gap:12px;padding:4px 10px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.shead .fic{width:46px;height:46px;border-radius:10px;overflow:hidden;position:relative}
+.shead .fic .t{position:absolute;inset:0}
+.shead b{display:block}
+.shead span{color:var(--muted);font-size:12px;font-family:ui-monospace,Consolas,monospace}
+.act{display:flex;align-items:center;gap:14px;width:100%;padding:12px 14px;border-radius:12px;text-align:left;font-weight:600}
+.act:hover{background:var(--hover)}
+.act small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.act.danger{color:#FF8A8C}
+.dialog{width:min(340px,88%);background:var(--panel);border-radius:22px;padding:24px 20px 16px;text-align:center;animation:popin .32s var(--ease-spring)}
+@keyframes popin{from{transform:translateY(10px) scale(.96);opacity:0}}
+.dialog h3{margin:12px 0 6px;font-size:18px}
+.dialog p{margin:0 0 16px;color:var(--muted);font-size:13px}
+.fp{width:84px;height:84px;margin:0 auto;border-radius:50%;display:grid;place-items:center;color:var(--red);background:rgba(229,56,59,.1);box-shadow:0 0 0 0 rgba(229,56,59,.4);animation:ring 1.6s ease-out infinite}
+.fp svg{width:46px;height:46px}
+.fp.ok{color:var(--green);background:rgba(61,220,138,.12);animation:none}
+@keyframes ring{70%{box-shadow:0 0 0 16px rgba(229,56,59,0)}100%{box-shadow:0 0 0 0 rgba(229,56,59,0)}}
+.dbtns{display:flex;gap:8px;justify-content:flex-end}
+.btn{padding:9px 16px;border-radius:10px;font-weight:700}
+.btn.pri{background:var(--red);color:#fff}
+.btn.pri:hover{background:#F04447;box-shadow:0 6px 16px rgba(229,56,59,.35);transform:translateY(-1px)}
+.btn.sec{color:var(--muted)}
+.btn.sec:hover{color:#fff}
+.input{width:100%;background:var(--chrome);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--text);font:13px ui-monospace,Consolas,monospace;margin-bottom:12px;outline:0}
+.input:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,56,59,.18)}
+.wn{text-align:left}
+.wn h4{margin:12px 0 4px;font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.05em}
+.wn ul{margin:0;padding-left:18px;color:var(--text);font-size:13px}
+
+.toast{position:absolute;left:50%;bottom:82px;transform:translateX(-50%);background:#33363d;border-left:3px solid var(--red);padding:10px 14px;border-radius:8px;font-size:13px;z-index:30;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;animation:popin .3s var(--ease-spring)}
+
+/* viewer */
+.viewer{position:absolute;inset:0;background:#000;z-index:15;display:flex;flex-direction:column;animation:fade .2s}
+.viewer .vimg{flex:1;margin:0;display:grid;place-items:center}
+.viewer .vimg .t{width:100%;aspect-ratio:4/3}
+.viewer .vtop,.viewer .vbot{display:flex;align-items:center;padding:6px 8px;gap:4px;color:#fff}
+.viewer .vtop .title{flex:1;font-weight:600;font-size:14px}
+.viewer .vbot{justify-content:space-around;padding-bottom:14px}
+.viewer .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:66px;height:66px;border-radius:50%;background:rgba(0,0,0,.5);display:grid;place-items:center}
+.viewer .play svg{width:30px;height:30px;fill:#fff;stroke:none}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="ptitle"><img id="logo" alt=""><span><span class="m">M</span> Photo</span><span style="color:var(--muted);font-weight:500;font-size:13px">· preview layout v1</span></div>
+  <div class="seg" id="devseg">
+    <button data-d="both" class="on">Cả hai màn</button><button data-d="outer">Màn ngoài</button><button data-d="inner">Màn trong</button>
+  </div>
+  <div class="pnote">Bấm thử được: chuyển Album / Thư mục, giữ lâu (hoặc nút ⋮) trên 1 thư mục để Ghim sao / Ẩn / Loại trừ / Sync, vào Cài đặt bật "Hiện thư mục ẩn" (giả lập vân tay), thêm đường dẫn loại trừ, bấm nút cập nhật.</div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<script>
+/* ---------- icons ---------- */
+const P={
+ album:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+ folder:'<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+ settings:'<path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+ refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+ star:'<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>',
+ eyeoff:'<path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c7 0 10 8 10 8a13 13 0 0 1-1.7 2.7"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m2 2 20 20"/>',
+ eye:'<path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z"/><circle cx="12" cy="12" r="3"/>',
+ ban:'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+ cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/>',
+ info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+ more:'<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>',
+ back:'<path d="m15 18-6-6 6-6"/>',
+ chev:'<path d="m9 18 6-6-6-6"/>',
+ play:'<path d="M7 4v16l13-8z"/>',
+ fp:'<path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ x:'<path d="M18 6 6 18M6 6l12 12"/>',
+ trash:'<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+ share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+ sparkles:'<path d="M9.94 14.06 4 16l5.94 1.94L12 24l2.06-6.06L20 16l-5.94-1.94L12 8z" transform="scale(.8) translate(3 -3)"/><path d="M19 2v4M17 4h4"/>',
+ shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+ home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+ image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>'
+};
+const I=(n,cls='')=>`<svg class="i ${cls}" viewBox="0 0 24 24">${P[n]}</svg>`;
+
+/* ---------- mock data ---------- */
+const FOLDERS=[
+ {p:'DCIM/Camera',n:1248,v:36,h:18},
+ {p:'DCIM/Screenshots',n:312,h:210},
+ {p:'Pictures/Concept Art',n:186,h:280},
+ {p:'Pictures/Concept Art/Characters',n:64,h:330},
+ {p:'Pictures/Concept Art/Environment',n:41,h:150},
+ {p:'Pictures/Spine Export',n:42,v:12,h:355},
+ {p:'Pictures/Instagram',n:73,h:320},
+ {p:'Pictures/Private',n:28,h:0},
+ {p:'Download',n:97,v:4,h:45},
+ {p:'Movies/Screen Recordings',n:18,v:18,h:200},
+ {p:'Movies/Animation Ref',n:9,v:9,h:260},
+ {p:'Android/media/com.zing.zalo/Zalo',n:256,h:190},
+ {p:'Android/media/com.zing.zalo/stickers',n:540,h:60},
+ {p:'Android/data/com.facebook.orca/cache',n:1220,h:230},
+ {p:'WhatsApp/Media/WhatsApp Stickers',n:210,h:120},
+ {p:'.thumbnails',n:3920,h:0},
+];
+const DEFAULT_RULES=[
+ {path:'.thumbnails',mode:'ex',sys:1},
+ {path:'Android/data',mode:'ex',sys:1},
+ {path:'*/stickers, */Stickers',mode:'ex',sys:1},
+ {path:'*/cache, */icons, */emoji',mode:'ex',sys:1},
+ {path:'Android/media/com.zing.zalo/Zalo',mode:'in',sys:0},
+];
+function excludedBy(rules,auto,p){
+  const low=p.toLowerCase();
+  for(const r of rules) if(r.mode==='in' && low.startsWith(r.path.toLowerCase())) return null;
+  for(const r of rules){
+    if(r.mode!=='ex'||(r.sys&&!auto)) continue;
+    for(const part of r.path.split(',').map(s=>s.trim().toLowerCase())){
+      if(part.startsWith('*/')){const seg=part.slice(2); if(low.split('/').includes(seg)) return r;}
+      else if(low===part||low.startsWith(part+'/')) return r;
+    }
+  }
+  return null;
+}
+const name=p=>p.split('/').pop();
+function thumb(h,k){const a=(h+k*37)%360,b=(a+40+k*13)%360,l=38+((k*17)%22);
+  return `<div class="t" style="background:linear-gradient(${(k*53)%360}deg,hsl(${a} 55% ${l}%),hsl(${b} 60% ${l-18}%)),#333"></div>`}
+const fmt=n=>n.toLocaleString('vi-VN');
+
+/* ---------- app ---------- */
+class App{
+  constructor(root,mode){
+    this.root=root;this.mode=mode;
+    this.s={tab:'album',path:[],open:null,showHidden:false,pinned:new Set(['DCIM/Camera','Pictures/Concept Art']),
+      hidden:new Set(['Pictures/Private']),rules:DEFAULT_RULES.map(r=>({...r})),auto:true,gsync:new Set(['DCIM/Camera']),
+      sheet:null,dlg:null,viewer:null,upd:'idle',toast:null};
+    root.addEventListener('click',e=>this.onClick(e));
+    root.addEventListener('pointerdown',e=>this.onDown(e));
+    ['pointerup','pointerleave','pointercancel','pointermove'].forEach(t=>root.addEventListener(t,e=>{if(t!=='pointermove'||Math.hypot(e.clientX-(this.dx||0),e.clientY-(this.dy||0))>8)clearTimeout(this.lp)}));
+    this.render();
+  }
+  visible(){const s=this.s;return FOLDERS.filter(f=>!excludedBy(s.rules,s.auto,f.p)&&(s.showHidden||!s.hidden.has(f.p)))}
+  sorted(list){const s=this.s;return [...list].sort((a,b)=>(s.pinned.has(b.p)-s.pinned.has(a.p))||b.n-a.n)}
+  toast(m){this.s.toast=m;this.render();clearTimeout(this.tt);this.tt=setTimeout(()=>{this.s.toast=null;this.render()},2200)}
+  onDown(e){
+    const c=e.target.closest('[data-lp]');if(!c)return;
+    this.dx=e.clientX;this.dy=e.clientY;
+    this.lp=setTimeout(()=>{this.suppress=true;navigator.vibrate&&navigator.vibrate(20);this.s.sheet=c.dataset.lp;this.render()},450);
+  }
+  onClick(e){
+    if(this.suppress){this.suppress=false;e.preventDefault();return}
+    const t=e.target.closest('[data-a]');if(!t)return;
+    const a=t.dataset.a,v=t.dataset.v,s=this.s;
+    if(t.classList.contains('scrim')&&e.target!==t)return;
+    switch(a){
+      case 'tab':s.tab=v;s.open=null;if(v==='folder')s.path=[];break;
+      case 'open':s.open=v;break;
+      case 'into':s.path=v?v.split('/'):[];s.open=null;break;
+      case 'back':
+        if(s.viewer!==null){s.viewer=null;break}
+        if(s.open&&this.mode==='compact'){s.open=null;break}
+        if(s.tab==='folder'&&s.path.length){s.path.pop();s.open=null}break;
+      case 'more':e.stopPropagation();s.sheet=v;break;
+      case 'close':s.sheet=null;s.dlg=null;break;
+      case 'pin':s.pinned.has(v)?s.pinned.delete(v):s.pinned.add(v);s.sheet=null;this.toast(s.pinned.has(v)?'Đã ghim lên đầu':'Đã bỏ ghim');return;
+      case 'hide':s.hidden.has(v)?s.hidden.delete(v):s.hidden.add(v);s.sheet=null;if(s.open===v&&!s.showHidden)s.open=null;this.toast(s.hidden.has(v)?'Đã ẩn thư mục':'Đã bỏ ẩn');return;
+      case 'exclude':s.rules.push({path:v,mode:'ex',sys:0});s.sheet=null;if(s.open===v)s.open=null;this.toast('Đã loại trừ · xem trong Cài đặt');return;
+      case 'gsync':s.sheet=null;s.gsync.add(v);this.toast('Mở Google Photos › Sao lưu thư mục trên thiết bị');return;
+      case 'hiddenToggle':if(s.showHidden){s.showHidden=false;this.toast('Đã ẩn lại thư mục ẩn');return}s.dlg='fp';break;
+      case 'fpok':s.dlg='fpdone';this.render();setTimeout(()=>{s.dlg=null;s.showHidden=true;this.toast('Đang hiện thư mục ẩn')},650);return;
+      case 'auto':s.auto=!s.auto;break;
+      case 'ruleMode':s.rules[+v].mode=s.rules[+v].mode==='ex'?'in':'ex';break;
+      case 'ruleDel':s.rules.splice(+v,1);break;
+      case 'addRule':s.dlg='add';break;
+      case 'addOk':{const inp=this.root.querySelector('#rp');const val=inp&&inp.value.trim();if(val){s.rules.push({path:val,mode:t.dataset.m,sys:0})}s.dlg=null;break}
+      case 'upd':if(s.upd==='checking')return;s.upd='checking';this.render();setTimeout(()=>{s.upd='latest';this.toast('Đã là bản mới nhất')},1200);return;
+      case 'whatsnew':s.dlg='wn';break;
+      case 'photo':s.viewer=+v;break;
+      case 'search':this.toast('Tìm theo tên thư mục');return;
+    }
+    this.render();
+  }
+  /* ----- pieces ----- */
+  topRight(){
+    const u=this.s.upd;
+    return `<button class="ibtn" data-a="search" title="Tìm">${I('search')}</button>
+      <button class="ibtn upd ${u==='checking'?'spin':u==='latest'?'ok':''}" data-a="upd" title="Kiểm tra cập nhật" aria-label="Kiểm tra cập nhật">${I('refresh')}</button>${u==='latest'?'<span class="latest">latest</span>':''}<span style="width:6px"></span>`;
+  }
+  card(f){
+    const s=this.s,pin=s.pinned.has(f.p),hid=s.hidden.has(f.p);
+    return `<div class="card ${s.open===f.p?'sel':''} ${hid?'dim':''}" data-a="open" data-v="${f.p}" data-lp="${f.p}" role="button" tabindex="0">
+      <div class="cover">${thumb(f.h,1)}${pin?`<span class="badge star">${I('star')}</span>`:''}${hid?`<span class="badge hid">${I('eyeoff')}</span>`:''}</div>
+      <div class="nm">${name(f.p)}</div><div class="ct">${fmt(f.n)}${f.v?` · ${f.v} video`:''}</div>
+      <button class="more" data-a="more" data-v="${f.p}" title="Tuỳ chọn">${I('more')}</button></div>`;
+  }
+  albumView(){
+    const list=this.sorted(this.visible()),pins=list.filter(f=>this.s.pinned.has(f.p)),rest=list.filter(f=>!this.s.pinned.has(f.p));
+    const cols=this.mode==='compact'?2:2;
+    return `${pins.length?`<div class="sect">${I('star','star-s')} Đã ghim</div><div class="grid" style="--cols:${cols}">${pins.map(f=>this.card(f)).join('')}</div>`:''}
+      <div class="sect">Tất cả thư mục có ảnh · ${rest.length}</div><div class="grid" style="--cols:${cols}">${rest.map(f=>this.card(f)).join('')}</div>`;
+  }
+  folderNodes(){
+    const s=this.s,pre=s.path.join('/'),vis=this.visible(),map=new Map();
+    for(const f of vis){
+      if(pre&&!(f.p===pre||f.p.startsWith(pre+'/')))continue;
+      const rest=pre?f.p.slice(pre.length+1):f.p;if(!rest)continue;
+      const seg=rest.split('/')[0],full=pre?pre+'/'+seg:seg;
+      const m=map.get(full)||{p:full,n:0,v:0,h:f.h,sub:0,own:null};
+      m.n+=f.n;m.v+=(f.v||0);if(f.p===full)m.own=f;else m.sub++;map.set(full,m);
+    }
+    return [...map.values()].sort((a,b)=>(s.pinned.has(b.p)-s.pinned.has(a.p))||a.p.localeCompare(b.p));
+  }
+  folderView(){
+    const s=this.s,nodes=this.folderNodes(),pre=s.path.join('/'),own=FOLDERS.find(f=>f.p===pre&&this.visible().includes(f));
+    let h='';
+    if(nodes.length)h+=`<div class="sect">Thư mục · ${nodes.length}</div>`+nodes.map(m=>{
+      const pin=s.pinned.has(m.p),hid=s.hidden.has(m.p),isLeaf=!m.sub;
+      return `<button class="row ${s.open===m.p?'sel':''}" data-a="${isLeaf?'open':'into'}" data-v="${m.p}" data-lp="${m.p}">
+        <span class="fic">${thumb(m.h,1)}${m.sub?`<span class="fold">${I('folder')}</span>`:''}</span>
+        <span class="tx"><b>${pin?I('star','star-s'):''}${name(m.p)}${hid?I('eyeoff'):''}</b><span>${m.sub?`${m.sub} thư mục con · `:''}${fmt(m.n)} mục${m.v?` · ${m.v} video`:''}</span></span>
+        <span class="chev">${I(isLeaf?'more':'chev')}</span></button>`}).join('');
+    if(own)h+=`<div class="sect">Ảnh trong "${name(pre)}" · ${fmt(own.n)}</div>`+this.photos(own,this.mode==='compact'?4:3,12);
+    return h||'<div class="empty"><div><h3>Trống</h3>Không có ảnh trong thư mục này</div></div>';
+  }
+  crumbs(){
+    const p=this.s.path;
+    return `<div class="crumbs"><button class="crumb ${p.length?'':'cur'}" data-a="into" data-v="">${'Bộ nhớ trong'}</button>${p.map((seg,i)=>`<span class="sep">›</span><button class="crumb ${i===p.length-1?'cur':''}" data-a="into" data-v="${p.slice(0,i+1).join('/')}">${seg}</button>`).join('')}</div>`;
+  }
+  photos(f,cols,max){
+    const n=Math.min(f.n,max||60);let h=`<div class="photos" style="--pcols:${cols}">`;
+    for(let k=0;k<n;k++){const vid=f.v&&(k%Math.max(1,Math.round(f.n/f.v))===0||f.v===f.n);
+      h+=`<button class="ph" data-a="photo" data-v="${k}">${thumb(f.h,k+2)}${vid?`<span class="dur">${I('play')}0:${String(10+k*7%49).padStart(2,'0')}</span>`:''}</button>`}
+    return h+'</div>';
+  }
+  albumDetail(f,compact,right=''){
+    return `<div class="topbar">${compact?`<button class="ibtn" data-a="back" title="Quay lại">${I('back')}</button>`:''}
+      <div class="title">${this.s.pinned.has(f.p)?I('star','star-s'):''}${name(f.p)}</div>
+      <button class="ibtn" data-a="more" data-v="${f.p}" title="Tuỳ chọn">${I('more')}</button>${right}</div>
+      <div style="padding:0 16px 10px;color:var(--muted);font-size:12px;font-family:ui-monospace,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">/${f.p} · ${fmt(f.n)} mục${this.s.gsync.has(f.p)?' · <span style="color:var(--green)">Sync GG Photos</span>':''}</div>
+      <div class="body">${this.photos(f,compact?4:5,80)}</div>`;
+  }
+  settings(){
+    const s=this.s;
+    return `<div class="gtitle">Hiển thị</div><div class="group">
+      <button class="item" data-a="hiddenToggle">${I(s.showHidden?'eye':'eyeoff')}<span class="tx"><b>Hiện thư mục ẩn</b><span>${s.hidden.size} thư mục · cần vân tay để mở</span></span><span class="sw ${s.showHidden?'on':''}"></span></button>
+      <button class="item" data-a="tab" data-v="folder">${I('folder')}<span class="tx"><b>Chế độ mở mặc định</b><span>Album (tất cả thư mục có ảnh)</span></span>${I('chev')}</button></div>
+    <div class="gtitle">Loại trừ thư mục</div><div class="group">
+      <button class="item" data-a="auto">${I('shield')}<span class="tx"><b>Tự loại trừ hệ thống, icon, sticker</b><span>Ẩn ảnh rác của app khỏi thư viện</span></span><span class="sw ${s.auto?'on':''}"></span></button>
+      ${s.rules.map((r,i)=>`<div class="rule" style="${r.sys&&!s.auto?'opacity:.45':''}"><div class="p">${r.path}<small>${r.sys?'Mặc định':'Bạn thêm'}</small></div>
+        <button class="chip ${r.mode}" data-a="ruleMode" data-v="${i}" title="Đổi loại trừ / không loại trừ">${r.mode==='ex'?'Loại trừ':'Không loại trừ'}</button>
+        ${r.sys?'':`<button class="ibtn" style="width:32px;height:32px" data-a="ruleDel" data-v="${i}" title="Xoá">${I('trash')}</button>`}</div>`).join('')}
+      <button class="addbtn" data-a="addRule">${I('plus')} Thêm đường dẫn</button></div>
+    <div class="gtitle">Google Photos</div><div class="group">
+      ${[...s.gsync].map(p=>`<div class="item">${I('cloud')}<span class="tx"><b>${name(p)}</b><span>/${p}</span></span><span class="chip in">Đang sync</span></div>`).join('')}
+      <button class="item" data-a="gsync" data-v="">${I('cloud')}<span class="tx"><b>Mở Sao lưu thư mục của Google Photos</b><span>Bật/tắt folder cần sync trong app Google Photos</span></span>${I('chev')}</button></div>
+    <div class="gtitle">Phiên bản</div><div class="group">
+      <button class="item" data-a="upd">${I('refresh')}<span class="tx"><b>Kiểm tra cập nhật</b><span>${s.upd==='latest'?'Đã là bản mới nhất':'Tự kiểm tra khi mở app'}</span></span><span class="ver">v1.0.0</span>${s.upd==='latest'?'<span class="latest">latest</span>':''}</button>
+      <button class="item" data-a="whatsnew">${I('sparkles')}<span class="tx"><b>What's new</b><span>Có gì mới ở bản này</span></span>${I('chev')}</button></div>`;
+  }
+  overlays(){
+    const s=this.s;let h='';
+    if(s.viewer!==null&&s.open){const f=FOLDERS.find(x=>x.p===s.open);
+      h+=`<div class="viewer"><div class="vtop"><button class="ibtn" data-a="back">${I('back')}</button><span class="title">${name(f.p)} · ${s.viewer+1}/${fmt(f.n)}</span><button class="ibtn">${I('info')}</button></div>
+        <div class="vimg" style="position:relative">${thumb(f.h,s.viewer+2)}${f.v&&s.viewer%3===0?`<span class="play">${I('play')}</span>`:''}</div>
+        <div class="vbot"><button class="ibtn">${I('star')}</button><button class="ibtn">${I('share')}</button><button class="ibtn">${I('trash')}</button></div></div>`}
+    if(s.sheet){const p=s.sheet,f=FOLDERS.find(x=>x.p===p)||{p,h:200};const pin=s.pinned.has(p),hid=s.hidden.has(p);
+      h+=`<div class="scrim" data-a="close"><div class="sheet"><div class="grab"></div>
+        <div class="shead"><span class="fic">${thumb(f.h,1)}</span><div style="min-width:0"><b>${name(p)}</b><span>/${p}</span></div></div>
+        <button class="act" data-a="pin" data-v="${p}">${I('star',pin?'star-s':'')}<span>${pin?'Bỏ ghim':'Ghim lên đầu'}<small>Đánh dấu sao, luôn nằm trên cùng</small></span></button>
+        <button class="act" data-a="hide" data-v="${p}">${I(hid?'eye':'eyeoff')}<span>${hid?'Bỏ ẩn':'Ẩn thư mục'}<small>Chỉ hiện khi mở khoá bằng vân tay</small></span></button>
+        <button class="act" data-a="gsync" data-v="${p}">${I('cloud')}<span>Sync lên Google Photos<small>${s.gsync.has(p)?'Đang sync · ':''}Mở cài đặt sao lưu thư mục</small></span></button>
+        <button class="act danger" data-a="exclude" data-v="${p}">${I('ban')}<span>Loại trừ khỏi thư viện<small>Không quét thư mục này nữa</small></span></button></div></div>`}
+    if(s.dlg==='fp'||s.dlg==='fpdone')h+=`<div class="scrim center"><div class="dialog"><div class="fp ${s.dlg==='fpdone'?'ok':''}">${I('fp')}</div>
+        <h3>${s.dlg==='fpdone'?'Đã xác thực':'Xác thực vân tay'}</h3><p>Chạm cảm biến vân tay để hiện thư mục ẩn</p>
+        <div class="dbtns"><button class="btn sec" data-a="close">Huỷ</button><button class="btn pri" data-a="fpok">Giả lập chạm</button></div></div></div>`;
+    if(s.dlg==='add')h+=`<div class="scrim center" data-a="close"><div class="dialog" style="text-align:left"><h3 style="margin-top:0">Thêm đường dẫn</h3>
+        <p>Nhập đường dẫn thư mục, hoặc dùng */tên để áp cho mọi thư mục cùng tên.</p>
+        <input class="input" id="rp" placeholder="vd: Android/media/com.app/icons" value="Pictures/Instagram">
+        <div class="dbtns"><button class="btn sec" data-a="close">Huỷ</button><button class="btn sec" data-a="addOk" data-m="in" style="color:var(--green)">Không loại trừ</button><button class="btn pri" data-a="addOk" data-m="ex">Loại trừ</button></div></div></div>`;
+    if(s.dlg==='wn')h+=`<div class="scrim center" data-a="close"><div class="dialog wn"><h3 style="margin-top:0;display:flex;align-items:center">What's new<span style="flex:1"></span><button class="ibtn" data-a="close" style="width:32px;height:32px">${I('x')}</button></h3>
+        <span class="ver">v1.0.0 · 08/11/2026</span><h4>Mới</h4><ul><li>Xem theo Album hoặc theo Thư mục</li><li>Ghim sao, ẩn thư mục (mở bằng vân tay)</li><li>Loại trừ thư mục hệ thống, icon, sticker</li><li>Sync thư mục lên Google Photos</li></ul></div></div>`;
+    if(s.toast)h+=`<div class="toast">${s.toast}</div>`;
+    return h;
+  }
+  /* ----- layouts ----- */
+  render(){
+    const s=this.s,inp=this.root.querySelector('#rp');const keep=inp&&inp.value;
+    const scrollEls=[...this.root.querySelectorAll('.body')].map(b=>b.scrollTop);
+    this.root.innerHTML=this.mode==='compact'?this.compact():this.expanded();
+    [...this.root.querySelectorAll('.body')].forEach((b,i)=>{if(scrollEls[i]!=null&&!this.resetScroll)b.scrollTop=scrollEls[i]});
+    if(keep!=null){const n=this.root.querySelector('#rp');if(n)n.value=keep}
+  }
+  mainList(){return this.s.tab==='album'?this.albumView():this.folderView()}
+  title(){return {album:'Album',folder:'Thư mục',settings:'Cài đặt'}[this.s.tab]}
+  compact(){
+    const s=this.s,f=s.open&&FOLDERS.find(x=>x.p===s.open);
+    let main;
+    if(f&&s.tab!=='settings')main=this.albumDetail(f,true);
+    else{
+      const back=s.tab==='folder'&&s.path.length;
+      main=`<div class="topbar">${back?`<button class="ibtn" data-a="back" title="Lên 1 cấp">${I('back')}</button>`:''}<div class="title">${back?s.path[s.path.length-1]:this.title()}</div>${this.topRight()}</div>
+        ${s.tab==='folder'?this.crumbs():''}<div class="body">${s.tab==='settings'?this.settings():this.mainList()}</div>`;
+    }
+    return `<div class="app">${main}
+      <div class="credit">Created by Mondiro</div>
+      <nav class="nav">${[['album','album','Album'],['folder','folder','Thư mục'],['settings','settings','Cài đặt']].map(([k,ic,l])=>`<button class="${s.tab===k?'on':''}" data-a="tab" data-v="${k}">${I(ic)}${l}</button>`).join('')}</nav>
+      ${this.overlays()}</div>`;
+  }
+  expanded(){
+    const s=this.s,f=s.open&&FOLDERS.find(x=>x.p===s.open);
+    const rail=`<div class="rail">${[['album','album','Album'],['folder','folder','Thư mục'],['settings','settings','Cài đặt']].map(([k,ic,l])=>`<button class="${s.tab===k?'on':''}" data-a="tab" data-v="${k}">${I(ic)}${l}</button>`).join('')}</div>`;
+    if(s.tab==='settings')return `<div class="app expanded">${rail}<div class="detail" style="background:var(--chrome)"><div class="topbar"><div class="title">Cài đặt</div>${this.topRight()}</div><div class="body" style="padding:0 18px 40px;max-width:640px;width:100%;margin:0 auto">${this.settings()}</div></div><div class="credit">Created by Mondiro</div>${this.overlays()}</div>`;
+    const back=s.tab==='folder'&&s.path.length;
+    const list=`<div class="listpane"><div class="topbar">${back?`<button class="ibtn" data-a="back">${I('back')}</button>`:''}<div class="title">${back?s.path[s.path.length-1]:this.title()}</div></div>${s.tab==='folder'?this.crumbs():''}<div class="body">${this.mainList()}</div></div>`;
+    const det=f?this.albumDetail(f,false,this.topRight()):`<div class="topbar"><div class="title"></div>${this.topRight()}</div><div class="empty"><div>${I('image')}<h3>Chọn 1 thư mục</h3>Ảnh và video sẽ hiện ở đây</div></div>`;
+    return `<div class="app expanded">${rail}${list}<div class="detail">${det}</div><div class="credit">Created by Mondiro</div>${this.overlays()}</div>`;
+  }
+}
+
+/* ---------- preview page ---------- */
+const ICON="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\">\n  <defs>\n    <linearGradient id=\"back\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#7B5CFF\"/><stop offset=\"1\" stop-color=\"#4B2BD6\"/>\n    </linearGradient>\n    <linearGradient id=\"frame\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#FFFFFF\"/><stop offset=\"1\" stop-color=\"#D9DCE3\"/>\n    </linearGradient>\n    <linearGradient id=\"sky\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#3D9BFF\"/><stop offset=\"1\" stop-color=\"#1747B8\"/>\n    </linearGradient>\n    <linearGradient id=\"hill1\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#3DE0C2\"/><stop offset=\"1\" stop-color=\"#128F79\"/>\n    </linearGradient>\n    <linearGradient id=\"hill2\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#22C3A6\"/><stop offset=\"1\" stop-color=\"#0B6B5A\"/>\n    </linearGradient>\n    <radialGradient id=\"sun\" cx=\".35\" cy=\".3\" r=\".75\">\n      <stop offset=\"0\" stop-color=\"#FF9A9C\"/><stop offset=\".55\" stop-color=\"#E5383B\"/><stop offset=\"1\" stop-color=\"#A3161A\"/>\n    </radialGradient>\n    <clipPath id=\"photo\"><rect x=\"104\" y=\"150\" width=\"304\" height=\"230\" rx=\"18\"/></clipPath>\n  </defs>\n  <ellipse cx=\"262\" cy=\"470\" rx=\"190\" ry=\"20\" fill=\"#000\" opacity=\".28\"/>\n  <!-- back card -->\n  <g transform=\"rotate(-10 256 256)\">\n    <rect x=\"66\" y=\"96\" width=\"370\" height=\"320\" rx=\"34\" fill=\"#2E1A8F\" transform=\"translate(0 14)\"/>\n    <rect x=\"66\" y=\"96\" width=\"370\" height=\"320\" rx=\"34\" fill=\"url(#back)\"/>\n  </g>\n  <!-- front card with thickness -->\n  <rect x=\"76\" y=\"136\" width=\"360\" height=\"320\" rx=\"34\" fill=\"#9AA0AC\"/>\n  <rect x=\"76\" y=\"122\" width=\"360\" height=\"320\" rx=\"34\" fill=\"url(#frame)\"/>\n  <g clip-path=\"url(#photo)\">\n    <rect x=\"104\" y=\"150\" width=\"304\" height=\"230\" fill=\"url(#sky)\"/>\n    <circle cx=\"322\" cy=\"218\" r=\"40\" fill=\"url(#sun)\"/>\n    <path d=\"M104 380 L104 318 L190 236 L268 314 L308 284 L408 360 L408 380 Z\" fill=\"url(#hill2)\"/>\n    <path d=\"M104 380 L104 346 L176 300 L250 352 L300 328 L408 380 Z\" fill=\"url(#hill1)\"/>\n  </g>\n  <rect x=\"104\" y=\"398\" width=\"120\" height=\"18\" rx=\"9\" fill=\"#C3C7D0\"/>\n  <path d=\"M96 140 Q160 128 230 132\" stroke=\"#fff\" stroke-width=\"10\" stroke-linecap=\"round\" opacity=\".7\" fill=\"none\"/>\n</svg>\n";
+document.getElementById('logo').src='data:image/svg+xml;utf8,'+encodeURIComponent(ICON);
+const stage=document.getElementById('stage');
+function dev(kind){
+  const w=document.createElement('div');w.className='devwrap';
+  w.innerHTML=`<div class="devlabel">${kind==='outer'?'MÀN NGOÀI · 6.5" · 21:9':'MÀN TRONG · 8" · gần vuông'}</div><div class="scaler"><div class="device dev-${kind}"><div class="screen"><div class="statusbar"><span>9:41</span><span class="cam"></span><span>5G ▮▮▮ 86%</span></div><div class="approot"></div></div></div></div>`;
+  stage.appendChild(w);new App(w.querySelector('.approot'),kind==='outer'?'compact':'expanded');return w;
+}
+let mode='both';
+function build(){
+  stage.innerHTML='';const els=[];
+  if(mode!=='inner')els.push(dev('outer'));
+  if(mode!=='outer')els.push(dev('inner'));
+  fit(els);
+}
+function fit(els){
+  const avail=Math.min(window.innerWidth-32,1400);
+  const natural=els.map(e=>e.querySelector('.device').offsetWidth+4);
+  const total=natural.reduce((a,b)=>a+b,0)+(els.length-1)*28;
+  els.forEach((e,i)=>{
+    let sc=1;
+    if(total>avail){sc=(window.innerWidth<700)?Math.min(1,avail/natural[i]):avail/total}
+    const sl=e.querySelector('.scaler'),d=sl.firstElementChild;
+    sl.style.transform=`scale(${sc})`;sl.style.width=d.offsetWidth*sc+'px';sl.style.height=d.offsetHeight*sc+'px';
+  });
+}
+document.getElementById('devseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  mode=b.dataset.d;document.querySelectorAll('#devseg button').forEach(x=>x.classList.toggle('on',x===b));build()});
+window.addEventListener('resize',()=>fit([...stage.children]));
+build();
+</script>
+</body>
+</html>
