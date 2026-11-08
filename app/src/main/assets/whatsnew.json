@@ -1,8 +1,6 @@
-{ "version": "1.3.2", "date": "2026-11-08",
-  "new": [],
-  "improved": [
-    "Nếu sau vài giây chưa thấy hộp thoại cài, app tự mở trình cài APK dự phòng"
+{ "version": "1.4.0", "date": "2026-11-08",
+  "new": [
+    "Xem video toàn màn hình: bấm nút mở rộng trên thanh điều khiển, video ngang tự xoay ngang máy"
   ],
-  "fixed": [
-    "Sửa lỗi bấm Cập nhật nhưng không hiện hộp thoại cài đặt"
-  ] }
+  "improved": [],
+  "fixed": [] }

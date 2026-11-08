@@ -41,6 +41,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
@@ -117,6 +119,7 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
     if (items.isEmpty()) return
     val pager = rememberPagerState(initialPage = state.index.coerceIn(0, items.lastIndex)) { items.size }
     var bars by remember { mutableStateOf(true) }
+    var videoFull by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<MediaItem?>(null) }
     val edits = remember { mutableStateMapOf<Long, Edit>() }
     var saving by remember { mutableStateOf<MediaItem?>(null) }
@@ -126,15 +129,16 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
     // Phép xoay/lật chỉ áp cho đúng phiên bản file (sau khi lưu, file đổi ngày sửa -> bỏ phép cũ)
     fun editOf(m: MediaItem): Edit = edits[m.id]?.takeIf { it.base == m.modified } ?: Edit(base = m.modified)
 
-    DisposableEffect(bars) {
+    DisposableEffect(bars, videoFull) {
         val window = (view.context as? Activity)?.window
         val ctl = window?.let { WindowCompat.getInsetsController(it, view) }
         ctl?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        if (bars) ctl?.show(WindowInsetsCompat.Type.systemBars()) else ctl?.hide(WindowInsetsCompat.Type.systemBars())
+        if (bars && !videoFull) ctl?.show(WindowInsetsCompat.Type.systemBars()) else ctl?.hide(WindowInsetsCompat.Type.systemBars())
         onDispose { ctl?.show(WindowInsetsCompat.Type.systemBars()) }
     }
-    LaunchedEffect(pager.currentPage) { vm.viewer = state.copy(index = pager.currentPage) }
+    LaunchedEffect(pager.currentPage) { vm.viewer = state.copy(index = pager.currentPage); videoFull = false }
     BackHandler { vm.viewer = null }
+    BackHandler(enabled = videoFull) { videoFull = false }
 
     val trash = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         if (it.resultCode == Activity.RESULT_OK) { vm.toast("Đã chuyển vào thùng rác"); vm.reload() }
@@ -158,10 +162,10 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        HorizontalPager(state = pager, key = { items[it].id }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pager, key = { items[it].id }, beyondViewportPageCount = 1, userScrollEnabled = !videoFull, modifier = Modifier.fillMaxSize()) { page ->
             val item = items[page]
             val current = page == pager.currentPage
-            if (item.isVideo) VideoPage(item, current, bars, onTap = { bars = !bars }, setBars = { bars = it })
+            if (item.isVideo) VideoPage(item, current, bars, videoFull && current, setFull = { videoFull = it }, onTap = { bars = !bars }, setBars = { bars = it })
             else ImagePage(
                 item, current, editOf(item),
                 onRotate = { d -> val e = editOf(item); edits[item.id] = e.copy(rotation = e.rotation + d) },
@@ -170,7 +174,7 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
 
         val cur = items.getOrNull(pager.currentPage)
         val edit = cur?.let { c -> edits[c.id]?.takeIf { it.base == c.modified } }
-        AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
+        AnimatedVisibility(bars && !videoFull, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
             Row(
                 Modifier.fillMaxWidth().background(Color(0x99000000)).statusBarsPadding().padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -202,7 +206,7 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
                 IconBtn(Icons.Outlined.Info, "Thông tin", tint = Color.White) { info = cur }
             }
         }
-        AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+        AnimatedVisibility(bars && !videoFull, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
             Row(
                 Modifier.fillMaxWidth().background(Color(0x99000000)).navigationBarsPadding().padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -352,7 +356,10 @@ fun ZoomBadge(z: ZoomState, rotating: Float = 0f, modifier: Modifier = Modifier)
 // ------------------------------------------------------------------ Video
 
 @Composable
-private fun VideoPage(item: MediaItem, isCurrent: Boolean, bars: Boolean, onTap: () -> Unit, setBars: (Boolean) -> Unit) {
+private fun VideoPage(
+    item: MediaItem, isCurrent: Boolean, bars: Boolean, full: Boolean, setFull: (Boolean) -> Unit,
+    onTap: () -> Unit, setBars: (Boolean) -> Unit,
+) {
     var playing by remember(item.id) { mutableStateOf(false) }
     LaunchedEffect(isCurrent) { if (!isCurrent) playing = false }
     val z = rememberZoomState(item.id)
@@ -362,7 +369,7 @@ private fun VideoPage(item: MediaItem, isCurrent: Boolean, bars: Boolean, onTap:
     Box(Modifier.fillMaxSize().zoomGestures(z, scope, onTap = onTap), contentAlignment = Alignment.Center) {
         ZoomBadge(z, modifier = Modifier.align(Alignment.Center))
         if (playing) {
-            VideoPlayer(item, z, bars, setBars)
+            VideoPlayer(item, z, bars, setBars, full, setFull)
         } else {
             AsyncImage(
                 model = imageRequest(item, 2048), contentDescription = item.name, contentScale = ContentScale.Fit,
@@ -377,7 +384,7 @@ private fun VideoPage(item: MediaItem, isCurrent: Boolean, bars: Boolean, onTap:
 }
 
 @Composable
-private fun VideoPlayer(item: MediaItem, z: ZoomState, bars: Boolean, setBars: (Boolean) -> Unit) {
+private fun VideoPlayer(item: MediaItem, z: ZoomState, bars: Boolean, setBars: (Boolean) -> Unit, full: Boolean, setFull: (Boolean) -> Unit) {
     val ctx = LocalContext.current
     val player = remember(item.id) {
         ExoPlayer.Builder(ctx).build().apply {
@@ -418,6 +425,18 @@ private fun VideoPlayer(item: MediaItem, z: ZoomState, bars: Boolean, setBars: (
     }
     // Đang phát thì tự ẩn thanh công cụ sau 3 giây
     LaunchedEffect(isPlaying, bars) { if (isPlaying && bars) { delay(3000); setBars(false) } }
+    // Toàn màn hình: video ngang thì xoay ngang máy, video dọc giữ dọc
+    val activity = ctx.findActivity()
+    val wide = (if (rotation % 180 != 0) 1f / aspect else aspect) >= 1f
+    DisposableEffect(full, wide) {
+        activity?.requestedOrientation = when {
+            !full -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            wide -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        }
+        onDispose { activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
+    LaunchedEffect(full) { if (full) z.reset() }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val disp = if (rotation % 180 != 0) 1f / aspect else aspect
@@ -432,7 +451,7 @@ private fun VideoPlayer(item: MediaItem, z: ZoomState, bars: Boolean, setBars: (
             Row(
                 Modifier
                     .navigationBarsPadding()
-                    .padding(start = 12.dp, end = 12.dp, bottom = 70.dp)
+                    .padding(start = 12.dp, end = 12.dp, bottom = if (full) 16.dp else 70.dp)
                     .widthIn(max = 640.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
@@ -451,6 +470,9 @@ private fun VideoPlayer(item: MediaItem, z: ZoomState, bars: Boolean, setBars: (
                     modifier = Modifier.weight(1f),
                 )
                 Text(fmtDur(dur), color = Color(0xFFB8BCC4), fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+                IconBtn(if (full) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen, if (full) "Thoát toàn màn hình" else "Toàn màn hình", tint = Color.White) {
+                    setFull(!full); setBars(true)
+                }
             }
         }
     }
