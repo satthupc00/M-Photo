@@ -19,6 +19,7 @@ data class MediaItem(
     val size: Long,
     val width: Int,
     val height: Int,
+    val modified: Long = 0,
 )
 
 class Folder(val path: String, val items: List<MediaItem>) {
@@ -85,6 +86,7 @@ object MediaRepository {
                     size = c.getLong(iSize),
                     width = c.getInt(iW),
                     height = c.getInt(iH),
+                    modified = c.getLong(iMod),
                 )
             }
         }

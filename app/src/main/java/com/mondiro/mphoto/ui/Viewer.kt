@@ -3,40 +3,50 @@ package com.mondiro.mphoto.ui
 import android.app.Activity
 import android.content.Intent
 import android.provider.MediaStore
-import android.widget.MediaController
-import android.widget.VideoView
+import android.view.TextureView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -47,35 +57,55 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
+import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
+import com.mondiro.mphoto.data.ImageEdit
 import com.mondiro.mphoto.data.MediaItem
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
+
+/** Phép xoay/lật đang xem thử của 1 ảnh (chưa lưu). rotation tính bằng độ, cộng dồn để animation xoay đúng chiều. */
+private data class Edit(val rotation: Float = 0f, val flip: Boolean = false) {
+    val isIdentity: Boolean get() = ((rotation.roundToInt() % 360) + 360) % 360 == 0 && !flip
+}
 
 @Composable
 fun Viewer(vm: AppViewModel, state: ViewerState) {
@@ -85,10 +115,12 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
     val pager = rememberPagerState(initialPage = state.index.coerceIn(0, items.lastIndex)) { items.size }
     var bars by remember { mutableStateOf(true) }
     var info by remember { mutableStateOf<MediaItem?>(null) }
+    val edits = remember { mutableStateMapOf<Long, Edit>() }
+    var saving by remember { mutableStateOf<MediaItem?>(null) }
     val ctx = LocalContext.current
     val view = LocalView.current
+    val scope = rememberCoroutineScope()
 
-    // Ẩn thanh trạng thái khi xem ảnh toàn màn hình
     DisposableEffect(bars) {
         val window = (view.context as? Activity)?.window
         val ctl = window?.let { WindowCompat.getInsetsController(it, view) }
@@ -103,39 +135,83 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
         if (it.resultCode == Activity.RESULT_OK) { vm.toast("Đã chuyển vào thùng rác"); vm.reload() }
     }
 
+    fun doSave(item: MediaItem) {
+        val e = edits[item.id] ?: return
+        scope.launch {
+            try {
+                ImageEdit.save(ctx, item, e.rotation.roundToInt(), e.flip)
+                vm.toast("Đã lưu ảnh")
+                vm.reload()
+                delay(700)
+                edits.remove(item.id)
+            } catch (ex: Exception) {
+                vm.toast("Không lưu được ảnh này")
+            }
+        }
+    }
+    val writeAccess = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        val it2 = saving; saving = null
+        if (it.resultCode == Activity.RESULT_OK && it2 != null) doSave(it2)
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, key = { items[it].id }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
             val item = items[page]
-            if (item.isVideo) VideoPage(item, isCurrent = page == pager.currentPage) { bars = !bars }
-            else ZoomImage(item) { bars = !bars }
+            val current = page == pager.currentPage
+            if (item.isVideo) VideoPage(item, current, bars, onTap = { bars = !bars }, setBars = { bars = it })
+            else ImagePage(item, current, edits[item.id] ?: Edit()) { bars = !bars }
         }
+
         val cur = items.getOrNull(pager.currentPage)
+        val edit = cur?.let { edits[it.id] }
         AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color(0x99000000))
-                    .statusBarsPadding()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                Modifier.fillMaxWidth().background(Color(0x99000000)).statusBarsPadding().padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "Quay lại", tint = Color.White) { vm.viewer = null }
                 Column(Modifier.weight(1f)) {
                     Text(cur?.name ?: "", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${pager.currentPage + 1}/${fmtCount(items.size)} · ${cur?.let { fmtDate(it.date) } ?: ""}", color = Color(0xFFB8BCC4), fontSize = 12.sp)
+                    Text("${pager.currentPage + 1}/${fmtCount(items.size)} · ${cur?.let { fmtDate(it.date) } ?: ""}", color = Color(0xFFB8BCC4), fontSize = 12.sp, maxLines = 1)
+                }
+                if (cur != null && edit != null && !edit.isIdentity) {
+                    Text(
+                        "Đặt lại", color = Color(0xFFCFD2D8), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).pressable { edits.remove(cur.id) }.padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                    Text(
+                        "Lưu", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Mc.red).pressable {
+                            if (!ImageEdit.canSave(cur.mime)) {
+                                vm.toast("Ảnh dạng ${cur.mime.substringAfter('/').uppercase()} chỉ xoay để xem, chưa lưu được")
+                            } else try {
+                                saving = cur
+                                val pi = MediaStore.createWriteRequest(ctx.contentResolver, listOf(cur.uri))
+                                writeAccess.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+                            } catch (_: Exception) { saving = null; vm.toast("Không lưu được ảnh này") }
+                        }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
                 }
                 IconBtn(Icons.Outlined.Info, "Thông tin", tint = Color.White) { info = cur }
             }
         }
         AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color(0x99000000))
-                    .navigationBarsPadding()
-                    .padding(vertical = 6.dp),
+                Modifier.fillMaxWidth().background(Color(0x99000000)).navigationBarsPadding().padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
+                if (cur != null && !cur.isVideo) {
+                    IconBtn(Icons.Outlined.RotateRight, "Xoay", tint = Color.White) {
+                        val e = edits[cur.id] ?: Edit()
+                        // Khi đang lật, xoay theo chiều ngược lại để trên màn hình vẫn là xoay phải
+                        edits[cur.id] = e.copy(rotation = e.rotation + if (e.flip) -90f else 90f)
+                    }
+                    IconBtn(Icons.Outlined.Flip, "Lật ngang", tint = Color.White) {
+                        val e = edits[cur.id] ?: Edit()
+                        edits[cur.id] = e.copy(flip = !e.flip)
+                    }
+                }
                 IconBtn(Icons.Outlined.Share, "Chia sẻ", tint = Color.White) {
                     cur ?: return@IconBtn
                     val send = Intent(Intent.ACTION_SEND).setType(cur.mime).putExtra(Intent.EXTRA_STREAM, cur.uri)
@@ -188,92 +264,187 @@ private fun InfoLine(k: String, v: String) {
 
 private fun fmtDate(ms: Long): String = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(ms))
 
+// ------------------------------------------------------------------ Ảnh
+
 @Composable
-private fun ZoomImage(item: MediaItem, onTap: () -> Unit) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    fun clamp(o: Offset, s: Float): Offset {
-        val mx = size.width * (s - 1f) / 2f
-        val my = size.height * (s - 1f) / 2f
-        return Offset(o.x.coerceIn(-mx, mx), o.y.coerceIn(-my, my))
-    }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .onSizeChanged { size = it }
-            .pointerInput(item.id) {
-                detectTapGestures(
-                    onTap = { onTap() },
-                    onDoubleTap = { p ->
-                        if (scale > 1f) { scale = 1f; offset = Offset.Zero } else {
-                            scale = 2.5f
-                            val center = Offset(size.width / 2f, size.height / 2f)
-                            offset = clamp((center - p) * 1.5f, 2.5f)
-                        }
-                    },
-                )
-            }
-            .pointerInput(item.id) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    do {
-                        val event = awaitPointerEvent()
-                        val multi = event.changes.count { it.pressed } > 1
-                        if (multi || scale > 1f) {
-                            val z = event.calculateZoom()
-                            val p = event.calculatePan()
-                            scale = (scale * z).coerceIn(1f, 6f)
-                            offset = if (scale <= 1f) Offset.Zero else clamp(offset + p, scale)
-                            event.changes.forEach { if (it.positionChanged()) it.consume() }
-                        }
-                    } while (event.changes.any { it.pressed })
-                }
-            },
-    ) {
+private fun ImagePage(item: MediaItem, isCurrent: Boolean, edit: Edit, onTap: () -> Unit) {
+    val z = rememberZoomState(item.id)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(isCurrent) { if (!isCurrent) z.reset() }
+    val rot by animateFloatAsState(edit.rotation, tween(320, easing = FastOutSlowInEasing), label = "rot")
+    val flipX by animateFloatAsState(if (edit.flip) -1f else 1f, tween(320, easing = FastOutSlowInEasing), label = "flip")
+    var intrinsic by remember(item.id, item.modified) { mutableStateOf(Size.Unspecified) }
+
+    BoxWithConstraints(Modifier.fillMaxSize().zoomGestures(z, scope, onTap)) {
+        val w = constraints.maxWidth.toFloat()
+        val h = constraints.maxHeight.toFloat()
+        // Hệ số thu nhỏ để ảnh xoay vẫn nằm gọn trong khung
+        val k = if (intrinsic.isSpecified && intrinsic.width > 0 && intrinsic.height > 0 && w > 0 && h > 0) {
+            val fs = min(w / intrinsic.width, h / intrinsic.height)
+            val fw = intrinsic.width * fs; val fh = intrinsic.height * fs
+            val rad = Math.toRadians(rot.toDouble())
+            val c = abs(cos(rad)).toFloat(); val s = abs(sin(rad)).toFloat()
+            val bw = fw * c + fh * s; val bh = fw * s + fh * c
+            min(w / bw, h / bh) / min(w / fw, h / fh)
+        } else 1f
         AsyncImage(
-            model = item.uri, contentDescription = item.name, contentScale = ContentScale.Fit,
+            model = imageRequest(item, 4096),
+            contentDescription = item.name,
+            contentScale = ContentScale.Fit,
+            onSuccess = { intrinsic = it.painter.intrinsicSize },
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y },
+                .zoomLayer(z)
+                .graphicsLayer { scaleX = flipX }
+                .graphicsLayer { rotationZ = rot; scaleX = k; scaleY = k },
         )
     }
 }
 
+// ------------------------------------------------------------------ Video
+
 @Composable
-private fun VideoPage(item: MediaItem, isCurrent: Boolean, onTap: () -> Unit) {
+private fun VideoPage(item: MediaItem, isCurrent: Boolean, bars: Boolean, onTap: () -> Unit, setBars: (Boolean) -> Unit) {
     var playing by remember(item.id) { mutableStateOf(false) }
     LaunchedEffect(isCurrent) { if (!isCurrent) playing = false }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    val z = rememberZoomState(item.id)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(isCurrent) { if (!isCurrent) z.reset() }
+
+    Box(Modifier.fillMaxSize().zoomGestures(z, scope, onTap), contentAlignment = Alignment.Center) {
         if (playing) {
-            AndroidView(
-                factory = { c ->
-                    VideoView(c).apply {
-                        val mc = MediaController(c)
-                        mc.setAnchorView(this)
-                        setMediaController(mc)
-                        setVideoURI(item.uri)
-                        setOnPreparedListener { start(); mc.show(2500) }
-                    }
-                },
-                onRelease = { it.stopPlayback() },
-                modifier = Modifier.fillMaxSize(),
-            )
+            VideoPlayer(item, z, bars, setBars)
         } else {
             AsyncImage(
-                model = item.uri, contentDescription = item.name, contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
+                model = imageRequest(item, 2048), contentDescription = item.name, contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().zoomLayer(z),
             )
             Box(
-                Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x88000000))
-                    .pressable { playing = true },
+                Modifier.size(72.dp).clip(CircleShape).background(Color(0x88000000)).pressable { playing = true },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Filled.PlayArrow, "Phát", tint = Color.White, modifier = Modifier.size(40.dp)) }
         }
+    }
+}
+
+@Composable
+private fun VideoPlayer(item: MediaItem, z: ZoomState, bars: Boolean, setBars: (Boolean) -> Unit) {
+    val ctx = LocalContext.current
+    val player = remember(item.id) {
+        ExoPlayer.Builder(ctx).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(item.uri))
+            prepare()
+            playWhenReady = true
+        }
+    }
+    var aspect by remember { mutableFloatStateOf(if (item.width > 0 && item.height > 0) item.width / item.height.toFloat() else 16f / 9f) }
+    var rotation by remember { mutableIntStateOf(0) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var ended by remember { mutableStateOf(false) }
+    var pos by remember { mutableLongStateOf(0L) }
+    var dur by remember { mutableLongStateOf(item.duration) }
+    var scrubbing by remember { mutableStateOf(false) }
+
+    DisposableEffect(player) {
+        val l = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    aspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+                    @Suppress("DEPRECATION")
+                    rotation = videoSize.unappliedRotationDegrees
+                }
+            }
+            override fun onIsPlayingChanged(p: Boolean) { isPlaying = p }
+            override fun onPlaybackStateChanged(s: Int) { ended = s == Player.STATE_ENDED; if (ended) setBars(true) }
+        }
+        player.addListener(l)
+        onDispose { player.removeListener(l); player.release() }
+    }
+    LaunchedEffect(player) {
+        while (true) {
+            if (!scrubbing) pos = player.currentPosition
+            if (player.duration > 0) dur = player.duration
+            delay(150)
+        }
+    }
+    // Đang phát thì tự ẩn thanh công cụ sau 3 giây
+    LaunchedEffect(isPlaying, bars) { if (isPlaying && bars) { delay(3000); setBars(false) } }
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val disp = if (rotation % 180 != 0) 1f / aspect else aspect
+        Box(Modifier.zoomLayer(z).aspectRatio(disp)) {
+            AndroidView(
+                factory = { c -> TextureView(c).also { player.setVideoTextureView(it) } },
+                modifier = Modifier.fillMaxSize().rotated(rotation),
+            )
+        }
+
+        AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+            Row(
+                Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 70.dp)
+                    .widthIn(max = 640.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xB3000000))
+                    .padding(start = 2.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBtn(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) "Tạm dừng" else "Phát", tint = Color.White) {
+                    if (isPlaying) player.pause() else { if (ended) player.seekTo(0); player.play() }
+                }
+                Text(fmtDur(pos), color = Color.White, fontSize = 12.sp, modifier = Modifier.width(44.dp))
+                SeekBar(
+                    fraction = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f,
+                    onScrub = { f -> scrubbing = true; pos = (f * dur).toLong() },
+                    onSeek = { f -> player.seekTo((f * dur).toLong()); pos = (f * dur).toLong(); scrubbing = false },
+                    modifier = Modifier.weight(1f),
+                )
+                Text(fmtDur(dur), color = Color(0xFFB8BCC4), fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+    }
+}
+
+/** Đặt view theo góc xoay của video (khi máy chưa tự xoay hình). */
+private fun Modifier.rotated(deg: Int): Modifier =
+    if (deg % 180 == 0) graphicsLayer { rotationZ = deg.toFloat() }
+    else layout { m, c ->
+        val p = m.measure(Constraints.fixed(c.maxHeight, c.maxWidth))
+        layout(c.maxWidth, c.maxHeight) { p.place((c.maxWidth - p.width) / 2, (c.maxHeight - p.height) / 2) }
+    }.graphicsLayer { rotationZ = deg.toFloat() }
+
+/** Thanh tua mảnh: vạch 3dp, nút tròn 12dp, vùng chạm cao 32dp. */
+@Composable
+private fun SeekBar(fraction: Float, onScrub: (Float) -> Unit, onSeek: (Float) -> Unit, modifier: Modifier = Modifier) {
+    var dragging by remember { mutableStateOf(false) }
+    var dragFrac by remember { mutableFloatStateOf(0f) }
+    val shown = if (dragging) dragFrac else fraction
+    val thumb by animateFloatAsState(if (dragging) 16f else 12f, label = "thumb")
+    BoxWithConstraints(
+        modifier
+            .height(32.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { o -> onSeek((o.x / size.width).coerceIn(0f, 1f)) }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { o -> dragging = true; dragFrac = (o.x / size.width).coerceIn(0f, 1f); onScrub(dragFrac) },
+                    onDragEnd = { dragging = false; onSeek(dragFrac) },
+                    onDragCancel = { dragging = false },
+                ) { ch, dx -> ch.consume(); dragFrac = (dragFrac + dx / size.width).coerceIn(0f, 1f); onScrub(dragFrac) }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x55FFFFFF)))
+        Box(Modifier.fillMaxWidth(shown).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Mc.red))
+        Box(
+            Modifier
+                .offset(x = maxWidth * shown - (thumb / 2).dp)
+                .size(thumb.dp)
+                .clip(CircleShape)
+                .background(Color.White),
+        )
     }
 }

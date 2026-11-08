@@ -177,7 +177,7 @@ fun TopBar(
 fun Thumb(item: MediaItem?, modifier: Modifier = Modifier, showVideo: Boolean = true) {
     Box(modifier.background(Mc.panel)) {
         if (item != null) {
-            AsyncImage(model = item.uri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            AsyncImage(model = imageRequest(item), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             if (item.isVideo && showVideo) {
                 Row(
                     Modifier
@@ -232,3 +232,16 @@ fun fmtSize(b: Long): String = when {
 
 fun countLabel(count: Int, videos: Int): String =
     fmtCount(count) + if (videos > 0) " · $videos video" else ""
+
+/** Yêu cầu tải ảnh có gắn ngày sửa, để ảnh vừa xoay/lật xong không bị lấy lại bản cũ trong bộ nhớ đệm. */
+@Composable
+fun imageRequest(item: MediaItem, maxSize: Int? = null): coil3.request.ImageRequest {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    return remember(item.uri, item.modified, maxSize) {
+        coil3.request.ImageRequest.Builder(ctx)
+            .data(item.uri)
+            .memoryCacheKeyExtra("mod", item.modified.toString())
+            .apply { if (maxSize != null) size(coil3.size.Size(maxSize, maxSize)) }
+            .build()
+    }
+}
