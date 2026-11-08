@@ -91,6 +91,18 @@ fun MPhotoRoot(vm: AppViewModel) {
         onPauseOrDispose { }
     }
 
+    // Hộp thoại cài bản cập nhật: mở từ màn hình app (Activity) để Android không chặn
+    LaunchedEffect(Unit) {
+        com.mondiro.mphoto.update.InstallEvents.confirm.collect { i ->
+            if (i != null) {
+                com.mondiro.mphoto.update.InstallEvents.confirm.value = null
+                try { (ctx.findActivity() ?: ctx).startActivity(i) } catch (e: Exception) {
+                    vm.toast("Không mở được hộp thoại cài: ${e.message}")
+                }
+            }
+        }
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize().background(Mc.chrome)) {
         val expanded = maxWidth >= 600.dp
         if (!vm.hasPermission) PermissionScreen { if (!granted()) launcher.launch(PERMS) }

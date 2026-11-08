@@ -12,8 +12,8 @@ android {
         applicationId = "com.mondiro.mphoto"
         minSdk = 30
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.3.1"
+        versionCode = 10
+        versionName = "1.3.2"
     }
 
     // Khoá ký APK lấy từ GitHub Secrets (MPHOTO_KEYSTORE_B64 + MPHOTO_KEY_PASSWORD), không lưu trong repo.

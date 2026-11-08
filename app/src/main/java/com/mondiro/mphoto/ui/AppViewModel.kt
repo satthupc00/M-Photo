@@ -303,8 +303,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun installApk(f: java.io.File) {
         try {
-            if (Updater.install(getApplication(), f)) pendingApk = null
-            else { pendingApk = f; toast("Bật \"Cho phép từ nguồn này\" cho M Photo rồi quay lại") }
+            if (Updater.install(getApplication(), f)) {
+                pendingApk = null
+                // 6 giây không thấy Android phản hồi -> mở trình cài kiểu cũ
+                viewModelScope.launch {
+                    delay(6000)
+                    if (!com.mondiro.mphoto.update.InstallEvents.gotCallback) {
+                        try { Updater.installViaView(getApplication(), f) } catch (e: Exception) {
+                            updateErrorText = "Lỗi cài: " + Updater.describe(e)
+                            (upd as? UpdState.Available)?.let { updateError = it.release }
+                        }
+                    }
+                }
+            } else { pendingApk = f; toast("Bật \"Cho phép từ nguồn này\" cho M Photo rồi quay lại") }
         } catch (e: Exception) {
             pendingApk = null
             updateErrorText = "Lỗi cài: " + Updater.describe(e)

@@ -213,6 +213,15 @@ object Updater {
         throw IllegalStateException("chuyển hướng quá nhiều")
     }
 
+    /** Cách cài dự phòng: mở file APK bằng trình cài của Android. */
+    fun installViaView(context: Context, file: File) {
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
     /** Trả về false nếu cần người dùng cấp quyền "cài app không rõ nguồn" trước. */
     fun install(context: Context, file: File): Boolean {
         if (!context.packageManager.canRequestPackageInstalls()) {
@@ -228,6 +237,9 @@ object Updater {
             setAppPackageName(context.packageName)
             setSize(file.length())
         }
+        // Dọn các phiên cài cũ còn treo của app
+        pi.mySessions.forEach { try { pi.abandonSession(it.sessionId) } catch (_: Exception) {} }
+        InstallEvents.gotCallback = false
         val id = pi.createSession(params)
         pi.openSession(id).use { s ->
             s.openWrite("base.apk", 0, file.length()).use { os ->
@@ -244,24 +256,30 @@ object Updater {
     }
 }
 
-/** Nhận kết quả cài đặt: cần người dùng xác nhận thì mở hộp thoại cài của Android. */
+/** Kênh báo kết quả cài từ InstallReceiver về màn hình app (mở hộp thoại cài từ Activity để Android không chặn). */
+object InstallEvents {
+    val confirm = kotlinx.coroutines.flow.MutableStateFlow<Intent?>(null)
+    val message = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    @Volatile var gotCallback = false
+}
+
+/** Nhận kết quả cài đặt: cần người dùng xác nhận thì chuyển hộp thoại cài cho màn hình app mở. */
 class InstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        InstallEvents.gotCallback = true
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
                 val confirm = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
                 else intent.getParcelableExtra(Intent.EXTRA_INTENT)
-                confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                try { if (confirm != null) context.startActivity(confirm) } catch (e: Exception) {
-                    Toast.makeText(context, "Không mở được hộp thoại cài: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                InstallEvents.confirm.value = confirm
             }
             PackageInstaller.STATUS_SUCCESS -> {}
+            PackageInstaller.STATUS_FAILURE_ABORTED -> {}
             else -> {
                 val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
-                if (status != PackageInstaller.STATUS_FAILURE_ABORTED)
-                    Toast.makeText(context, "Cài bản cập nhật lỗi ($status) $msg", Toast.LENGTH_LONG).show()
+                InstallEvents.message.value = "Cài bản cập nhật lỗi ($status) $msg"
+                Toast.makeText(context, "Cài bản cập nhật lỗi ($status) $msg", Toast.LENGTH_LONG).show()
             }
         }
     }
