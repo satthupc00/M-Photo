@@ -83,6 +83,7 @@ fun MPhotoRoot(vm: AppViewModel) {
         vm.checkUpdate(manual = false)
     }
     LifecycleResumeEffect(Unit) {
+        vm.onResume()
         val g = granted()
         if (g != vm.hasPermission) vm.onPermission(g) else if (g && vm.loadedOnce) vm.reload(debounce = true)
         onPauseOrDispose { }

@@ -264,19 +264,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** File APK đã tải xong nhưng chờ người dùng cấp quyền "cài ứng dụng". */
+    private var pendingApk: java.io.File? = null
+
     fun downloadAndInstall(r: Release) {
         val url = r.apkUrl ?: run { toast("Bản này chưa có file cài"); return }
+        if (upd is UpdState.Downloading) return
         updateDialog = null
         viewModelScope.launch {
             upd = UpdState.Downloading(0f)
-            try {
-                val f = Updater.download(getApplication(), url) { p -> upd = UpdState.Downloading(p) }
-                upd = UpdState.Available(r)
-                if (!Updater.install(getApplication(), f)) toast("Cho phép M Photo cài ứng dụng, rồi bấm cập nhật lại")
+            val f = try {
+                Updater.download(getApplication(), url, r.version) { p -> upd = UpdState.Downloading(p) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 upd = UpdState.Available(r)
-                toast("Tải bản cập nhật bị lỗi")
+                updateError = r
+                return@launch
             }
+            upd = UpdState.Available(r)
+            installApk(f)
         }
     }
+
+    private fun installApk(f: java.io.File) {
+        try {
+            if (Updater.install(getApplication(), f)) pendingApk = null
+            else { pendingApk = f; toast("Bật \"Cho phép từ nguồn này\" cho M Photo rồi quay lại") }
+        } catch (e: Exception) {
+            pendingApk = null
+            toast("Không mở được trình cài đặt")
+            (upd as? UpdState.Available)?.let { updateError = it.release }
+        }
+    }
+
+    /** Gọi khi app quay lại màn hình: nếu vừa cấp quyền cài app thì cài luôn. */
+    fun onResume() {
+        val f = pendingApk ?: return
+        if (getApplication<Application>().packageManager.canRequestPackageInstalls() && f.exists()) installApk(f)
+    }
+
+    /** Lỗi tải: hiện hộp thoại cho tải bằng trình duyệt. */
+    var updateError by mutableStateOf<Release?>(null)
 }

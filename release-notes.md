@@ -1,7 +1,13 @@
-## M Photo v1.0.1 · 08/11/2026
+## M Photo v1.0.2 · 08/11/2026
+
+### Mới
+- Khi tải bản cập nhật bị lỗi: có nút Thử lại và Tải bằng trình duyệt
 
 ### Cải thiện
-- Giữ nguyên vị trí đang xem khi mở thư mục rồi quay ra ở chế độ Album, không bị nhảy về đầu trang
-- Chế độ Thư mục cũng nhớ vị trí cuộn của từng thư mục, kể cả khi đổi qua lại giữa các tab
+- Tải bản cập nhật bằng trình tải xuống của Android, có hiện tiến trình trên thanh thông báo
+- Sau khi cho phép cài ứng dụng, quay lại app là tự cài luôn, không phải bấm lại
 
-**Cập nhật:** mở M Photo, bấm nút cập nhật (mũi tên xoay) để tải và cài bản mới. Hoặc tải file `MPhoto-v1.0.1.apk` bên dưới.
+### Sửa lỗi
+- Sửa lỗi "Tải bản cập nhật bị lỗi" khi bấm cập nhật
+
+**Lưu ý:** bản v1.0.0 / v1.0.1 bị lỗi tự cập nhật, nên lần này hãy tải file `MPhoto-v1.0.2.apk` bên dưới bằng trình duyệt và mở để cài đè. Từ v1.0.2 trở đi app tự cập nhật bình thường.

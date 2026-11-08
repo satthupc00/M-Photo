@@ -2,11 +2,14 @@ package com.mondiro.mphoto.update
 
 import android.content.Context
 import android.content.Intent
+import android.app.DownloadManager
 import android.net.Uri
+import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.mondiro.mphoto.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -65,33 +68,43 @@ object Updater {
         return false
     }
 
-    suspend fun download(context: Context, url: String, onProgress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+    /** Tải APK bằng DownloadManager của Android (tự theo chuyển hướng của GitHub, hiện thông báo tải). */
+    suspend fun download(context: Context, url: String, version: String, onProgress: suspend (Float) -> Unit): File {
+        val dm = context.getSystemService(DownloadManager::class.java)
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: File(context.filesDir, "dl")
+        dir.mkdirs()
         dir.listFiles()?.forEach { it.delete() }
-        val out = File(dir, "MPhoto.apk")
-        var conn = URL(url).openConnection() as HttpURLConnection
-        conn.instanceFollowRedirects = true
-        conn.setRequestProperty("User-Agent", "MPhoto-Android")
-        // GitHub chuyển hướng sang máy chủ khác -> tự theo
-        var hops = 0
-        while (conn.responseCode in 300..399 && hops++ < 5) {
-            val loc = conn.getHeaderField("Location"); conn.disconnect()
-            conn = URL(loc).openConnection() as HttpURLConnection
-            conn.setRequestProperty("User-Agent", "MPhoto-Android")
-        }
-        val total = conn.contentLengthLong
-        conn.inputStream.use { input ->
-            out.outputStream().use { o ->
-                val buf = ByteArray(64 * 1024); var done = 0L
-                while (true) {
-                    val n = input.read(buf); if (n < 0) break
-                    o.write(buf, 0, n); done += n
-                    if (total > 0) onProgress(done.toFloat() / total)
+        val dest = File(dir, "MPhoto-v$version.apk")
+        val req = DownloadManager.Request(Uri.parse(url))
+            .setTitle("M Photo v$version")
+            .setDescription("Đang tải bản cập nhật")
+            .setMimeType("application/vnd.android.package-archive")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setDestinationUri(Uri.fromFile(dest))
+        val id = dm.enqueue(req)
+        try {
+            while (true) {
+                delay(400)
+                val (status, done, total, reason) = withContext(Dispatchers.IO) {
+                    dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
+                        if (!c.moveToFirst()) null
+                        else listOf(
+                            c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)).toLong(),
+                            c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+                            c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)),
+                            c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)).toLong(),
+                        )
+                    } ?: throw IllegalStateException("đã bị huỷ")
+                }
+                if (total > 0) onProgress(done.toFloat() / total)
+                when (status.toInt()) {
+                    DownloadManager.STATUS_SUCCESSFUL -> return dest
+                    DownloadManager.STATUS_FAILED -> throw IllegalStateException("mã lỗi $reason")
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            dm.remove(id); throw e
         }
-        conn.disconnect()
-        out
     }
 
     /** Trả về false nếu cần người dùng cấp quyền "cài app không rõ nguồn" trước. */
@@ -104,6 +117,7 @@ object Updater {
             return false
         }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        // Dùng PackageInstaller qua ACTION_VIEW; nếu máy không mở được thì để người dùng tải bằng trình duyệt
         context.startActivity(
             Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)

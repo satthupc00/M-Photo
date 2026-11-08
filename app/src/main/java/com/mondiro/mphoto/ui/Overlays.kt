@@ -329,6 +329,24 @@ fun Dialogs(vm: AppViewModel) {
         )
     }
 
+    vm.updateError?.let { r ->
+        AlertDialog(
+            onDismissRequest = { vm.updateError = null },
+            containerColor = Mc.panel,
+            title = { Text("Không tải được bản cập nhật", fontWeight = FontWeight.Bold) },
+            text = { Text("Kiểm tra mạng rồi thử lại, hoặc tải file cài v${r.version} bằng trình duyệt rồi mở file để cài.", color = Mc.text, fontSize = 14.sp) },
+            confirmButton = {
+                TextButton({ vm.updateError = null; vm.downloadAndInstall(r) }) { Text("Thử lại", color = Mc.green, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton({
+                    vm.updateError = null
+                    try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.apkUrl ?: r.pageUrl))) } catch (_: Exception) { vm.toast("Không mở được trình duyệt") }
+                }) { Text("Tải bằng trình duyệt", color = Mc.muted) }
+            },
+        )
+    }
+
     val s = vm.upd
     if (s is UpdState.Downloading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {

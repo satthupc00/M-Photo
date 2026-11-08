@@ -1,7 +1,11 @@
-{ "version": "1.0.1", "date": "2026-11-08",
-  "new": [],
-  "improved": [
-    "Giữ nguyên vị trí đang xem khi mở thư mục rồi quay ra ở chế độ Album, không bị nhảy về đầu trang",
-    "Chế độ Thư mục cũng nhớ vị trí cuộn của từng thư mục, kể cả khi đổi qua lại giữa các tab"
+{ "version": "1.0.2", "date": "2026-11-08",
+  "new": [
+    "Khi tải bản cập nhật bị lỗi: có nút Thử lại và Tải bằng trình duyệt"
   ],
-  "fixed": [] }
+  "improved": [
+    "Tải bản cập nhật bằng trình tải xuống của Android, có hiện tiến trình trên thanh thông báo",
+    "Sau khi cho phép cài ứng dụng, quay lại app là tự cài luôn, không phải bấm lại"
+  ],
+  "fixed": [
+    "Sửa lỗi \"Tải bản cập nhật bị lỗi\" khi bấm cập nhật"
+  ] }
