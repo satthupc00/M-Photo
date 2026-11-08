@@ -1,12 +1,7 @@
-{ "version": "1.0.0", "date": "2026-11-08",
-  "new": [
-    "Xem ảnh, video theo Album (tất cả thư mục có ảnh) hoặc theo Thư mục (đi từng cấp)",
-    "Ghim sao thư mục để luôn nằm trên cùng",
-    "Ẩn thư mục, mở lại bằng vân tay",
-    "Tự loại trừ thư mục hệ thống, icon, sticker; thêm đường dẫn loại trừ / không loại trừ",
-    "Đánh dấu thư mục để sync lên Google Photos",
-    "Giao diện riêng cho màn ngoài và màn trong Z Fold 7",
-    "Tự kiểm tra và cài bản cập nhật mới"
+{ "version": "1.0.1", "date": "2026-11-08",
+  "new": [],
+  "improved": [
+    "Giữ nguyên vị trí đang xem khi mở thư mục rồi quay ra ở chế độ Album, không bị nhảy về đầu trang",
+    "Chế độ Thư mục cũng nhớ vị trí cuộn của từng thư mục, kể cả khi đổi qua lại giữa các tab"
   ],
-  "improved": [],
   "fixed": [] }

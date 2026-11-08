@@ -194,6 +194,7 @@ private fun MainPane(vm: AppViewModel, fixedCols: Int?, bottomPad: androidx.comp
 private fun SearchBar(vm: AppViewModel) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { fr.requestFocus() }
+    LaunchedEffect(vm.search) { vm.searchGridState.scrollToItem(0) }
     Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "Đóng tìm") { vm.search = null }
         TextField(

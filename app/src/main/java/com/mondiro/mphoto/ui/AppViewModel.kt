@@ -6,6 +6,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +69,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var sysOff by mutableStateOf(prefs.sysOff)
     var autoExclude by mutableStateOf(prefs.autoExclude)
     var defaultTab by mutableStateOf(prefs.defaultTab)
+
+    // Giữ vị trí cuộn khi mở thư mục rồi quay ra, hoặc đổi tab
+    val albumGridState = LazyGridState()
+    val searchGridState = LazyGridState()
+    private val folderListStates = HashMap<String, LazyListState>()
+    fun folderListState(path: String): LazyListState = folderListStates.getOrPut(path) { LazyListState() }
 
     var upd by mutableStateOf<UpdState>(UpdState.Idle)
     var updateDialog by mutableStateOf<Release?>(null)

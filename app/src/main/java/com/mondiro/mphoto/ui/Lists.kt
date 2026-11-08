@@ -60,6 +60,7 @@ fun StarIcon(size: Dp = 16.dp) = Icon(Icons.Filled.Star, null, tint = Mc.star, m
 
 @Composable
 fun AlbumGrid(vm: AppViewModel, folders: List<Folder>, fixedCols: Int?, bottomPad: Dp, searching: Boolean = false) {
+    val gridState = if (vm.search != null) vm.searchGridState else vm.albumGridState
     if (folders.isEmpty()) {
         EmptyState(
             if (searching) "Không tìm thấy" else if (vm.loading) "Đang quét ảnh…" else "Chưa có ảnh",
@@ -70,6 +71,7 @@ fun AlbumGrid(vm: AppViewModel, folders: List<Folder>, fixedCols: Int?, bottomPa
     val pins = if (searching) emptyList() else folders.filter { it.path in vm.pinned }
     val rest = if (searching) folders else folders.filter { it.path !in vm.pinned }
     LazyVerticalGrid(
+        state = gridState,
         columns = if (fixedCols != null) GridCells.Fixed(fixedCols) else GridCells.Adaptive(150.dp),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = bottomPad),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -167,6 +169,7 @@ fun FolderList(vm: AppViewModel, bottomPad: Dp) {
         return
     }
     LazyColumn(
+        state = vm.folderListState(vm.path.joinToString("/")),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = bottomPad),
         modifier = Modifier.fillMaxSize(),
     ) {
