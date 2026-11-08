@@ -87,9 +87,9 @@ fun SettingsScreen(vm: AppViewModel, bottomPad: Dp) {
                     })
                     Item(Icons.Outlined.GridView, "Cỡ ô Album", null, trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Chip("Nhỏ", vm.albumSize == 0, Mc.red) { vm.setAlbumSize(0) }
-                            Chip("Vừa", vm.albumSize == 1, Mc.red) { vm.setAlbumSize(1) }
-                            Chip("To", vm.albumSize == 2, Mc.red) { vm.setAlbumSize(2) }
+                            Chip("Nhỏ", vm.albumSize == 0, Mc.red) { vm.changeAlbumSize(0) }
+                            Chip("Vừa", vm.albumSize == 1, Mc.red) { vm.changeAlbumSize(1) }
+                            Chip("To", vm.albumSize == 2, Mc.red) { vm.changeAlbumSize(2) }
                         }
                     })
                 }

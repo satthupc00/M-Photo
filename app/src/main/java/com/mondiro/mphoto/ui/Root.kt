@@ -323,7 +323,7 @@ private fun AlbumSizeButton(vm: AppViewModel) {
     val icon = when (vm.albumSize) { 0 -> Icons.Outlined.Apps; 1 -> Icons.Outlined.ViewModule; else -> Icons.Outlined.GridView }
     IconBtn(icon, "Cỡ ô Album") {
         val next = if (vm.albumSize == 0) 2 else vm.albumSize - 1
-        vm.setAlbumSize(next)
+        vm.changeAlbumSize(next)
         vm.toast("Cỡ ô: " + when (next) { 0 -> "Nhỏ"; 1 -> "Vừa"; else -> "To" })
     }
 }

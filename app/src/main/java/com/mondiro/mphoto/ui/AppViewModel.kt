@@ -80,7 +80,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPan(v: Float) { panSpeed = v; UiPrefs.pan = v; prefs.panSpeed = v }
     fun setScroll(v: Float) { scrollSpeed = v; prefs.scrollSpeed = v }
-    fun setAlbumSize(v: Int) { albumSize = v.coerceIn(0, 2); prefs.albumSize = albumSize }
+    fun changeAlbumSize(v: Int) { albumSize = v.coerceIn(0, 2); prefs.albumSize = albumSize }
 
     // Giữ vị trí cuộn khi mở thư mục rồi quay ra, hoặc đổi tab
     val albumGridState = LazyGridState()
