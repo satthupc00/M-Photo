@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -30,6 +31,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.exp
 
+const val MAX_ZOOM = 10f
+const val DOUBLE_TAP_ZOOM = 3f
+
 /** Trạng thái phóng to / kéo của 1 ảnh hoặc video trong trình xem. */
 @Stable
 class ZoomState(private val scope: CoroutineScope) {
@@ -37,6 +41,12 @@ class ZoomState(private val scope: CoroutineScope) {
     var offsetX by mutableFloatStateOf(0f)
     var offsetY by mutableFloatStateOf(0f)
     var size by mutableStateOf(IntSize.Zero)
+    /** Góc xoay tự do đang xoay bằng 2 ngón (chưa thả tay). */
+    var freeRotation by mutableFloatStateOf(0f)
+    /** Đang có thao tác zoom (để hiện số %). */
+    var touching by mutableStateOf(false)
+    /** Tăng mỗi lần mức zoom đổi, để hiện số % rồi tự ẩn. */
+    var zoomEvent by mutableStateOf(0)
     private var anim: Job? = null
 
     val zoomed: Boolean get() = scale > 1.02f
@@ -48,9 +58,10 @@ class ZoomState(private val scope: CoroutineScope) {
     }
 
     /** Phóng theo hệ số z quanh điểm f (toạ độ trong khung), giữ điểm f đứng yên dưới ngón tay. */
-    fun zoomBy(z: Float, f: Offset, pan: Offset = Offset.Zero, min: Float = 0.6f, max: Float = 8f) {
+    fun zoomBy(z: Float, f: Offset, pan: Offset = Offset.Zero, min: Float = 0.6f, max: Float = MAX_ZOOM) {
         anim?.cancel()
         val ns = (scale * z).coerceIn(min, max)
+        if (ns != scale) zoomEvent++
         val rz = ns / scale
         val c = Offset(size.width / 2f, size.height / 2f)
         val fc = f - c
@@ -77,6 +88,7 @@ class ZoomState(private val scope: CoroutineScope) {
             val rz = s / s0
             clamped(Offset(x0, y0) * rz + fc * (1f - rz), s)
         }
+        zoomEvent++
         anim = scope.launch {
             animate(0f, 1f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)) { v, _ ->
                 scale = s0 + (s - s0) * v
@@ -116,7 +128,12 @@ fun Modifier.zoomLayer(z: ZoomState): Modifier = graphicsLayer {
  *  - 1 ngón khi đang phóng: kéo ảnh
  *  - chạm 1 lần: onTap (ẩn/hiện thanh công cụ)
  */
-fun Modifier.zoomGestures(z: ZoomState, scope: CoroutineScope, onTap: () -> Unit): Modifier = this
+fun Modifier.zoomGestures(
+    z: ZoomState,
+    scope: CoroutineScope,
+    onRotateEnd: ((Float) -> Unit)? = null,
+    onTap: () -> Unit,
+): Modifier = this
     .onSizeChanged { z.size = it }
     .pointerInput(z) {
         var lastUp = 0L
@@ -141,13 +158,15 @@ fun Modifier.zoomGestures(z: ZoomState, scope: CoroutineScope, onTap: () -> Unit
                     if (dragging) {
                         val step = ch.position.y - prevY
                         prevY = ch.position.y
-                        z.zoomBy(exp(step / 220f), down.position, min = 1f)
+                        z.touching = true
+                        z.zoomBy(exp(step / 200f), down.position, min = 1f)
                         ch.consume()
                     }
                 }
                 if (!dragging) {
-                    if (z.zoomed) z.animateTo(1f) else z.animateTo(2.5f, down.position)
+                    if (z.zoomed) z.animateTo(1f) else z.animateTo(DOUBLE_TAP_ZOOM, down.position)
                 } else z.settle()
+                z.touching = false
                 return@awaitEachGesture
             }
 
@@ -155,6 +174,8 @@ fun Modifier.zoomGestures(z: ZoomState, scope: CoroutineScope, onTap: () -> Unit
             var multi = false
             var upTime = down.uptimeMillis
             var upConsumed = false
+            var rotAcc = 0f
+            var rotating = false
             do {
                 val ev = awaitPointerEvent()
                 upTime = ev.changes.first().uptimeMillis
@@ -162,6 +183,13 @@ fun Modifier.zoomGestures(z: ZoomState, scope: CoroutineScope, onTap: () -> Unit
                 val pressed = ev.changes.count { it.pressed }
                 if (pressed > 1) multi = true
                 if (multi && pressed > 1) {
+                    z.touching = true
+                    if (onRotateEnd != null) {
+                        rotAcc += ev.calculateRotation()
+                        // Xoay quá 15° mới tính là xoay, tránh lỡ tay khi chỉ muốn zoom
+                        if (!rotating && abs(rotAcc) > 15f) rotating = true
+                        if (rotating) z.freeRotation = rotAcc
+                    }
                     z.zoomBy(ev.calculateZoom(), ev.calculateCentroid(useCurrent = true), ev.calculatePan())
                     ev.changes.forEach { if (it.positionChanged()) it.consume() }
                     moved = true
@@ -175,6 +203,8 @@ fun Modifier.zoomGestures(z: ZoomState, scope: CoroutineScope, onTap: () -> Unit
                 }
             } while (ev.changes.any { it.pressed })
 
+            z.touching = false
+            if (rotating) onRotateEnd?.invoke(z.freeRotation)
             if (multi || moved) {
                 z.settle()
             } else if (!upConsumed && upTime - down.uptimeMillis < 500) {

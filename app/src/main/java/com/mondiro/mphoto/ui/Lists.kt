@@ -238,8 +238,11 @@ private fun NodeRow(
 
 @Composable
 fun FolderDetail(vm: AppViewModel, f: Folder, compact: Boolean, bottomPad: Dp, actions: @Composable () -> Unit = {}) {
+    val selecting = vm.selection.isNotEmpty() && vm.selectionFolder == f.path
+    androidx.activity.compose.BackHandler(enabled = selecting) { vm.clearSelection() }
     Column(Modifier.fillMaxSize()) {
-        TopBar(
+        if (selecting) SelectionTopBar(vm, f.count) { vm.selectAll(f) }
+        else TopBar(
             f.name,
             onBack = if (compact) ({ vm.openFolder = null }) else null,
             star = f.path in vm.pinned,
@@ -263,14 +266,7 @@ fun FolderDetail(vm: AppViewModel, f: Folder, compact: Boolean, bottomPad: Dp, a
             contentPadding = PaddingValues(bottom = bottomPad),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(f.items.size, key = { f.items[it].id }) { i ->
-                Thumb(
-                    f.items[i],
-                    Modifier
-                        .aspectRatio(1f)
-                        .pressable { vm.viewer = ViewerState(f.path, i) },
-                )
-            }
+            items(f.items.size, key = { f.items[it].id }) { i -> GridThumb(vm, f.path, f.items[i], i) }
         }
     }
 }

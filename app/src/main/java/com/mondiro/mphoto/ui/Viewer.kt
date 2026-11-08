@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -42,6 +43,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
@@ -103,7 +106,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Phép xoay/lật đang xem thử của 1 ảnh (chưa lưu). rotation tính bằng độ, cộng dồn để animation xoay đúng chiều. */
-private data class Edit(val rotation: Float = 0f, val flip: Boolean = false) {
+private data class Edit(val rotation: Float = 0f, val flip: Boolean = false, val base: Long = 0L) {
     val isIdentity: Boolean get() = ((rotation.roundToInt() % 360) + 360) % 360 == 0 && !flip
 }
 
@@ -120,6 +123,8 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
     val ctx = LocalContext.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
+    // Phép xoay/lật chỉ áp cho đúng phiên bản file (sau khi lưu, file đổi ngày sửa -> bỏ phép cũ)
+    fun editOf(m: MediaItem): Edit = edits[m.id]?.takeIf { it.base == m.modified } ?: Edit(base = m.modified)
 
     DisposableEffect(bars) {
         val window = (view.context as? Activity)?.window
@@ -136,14 +141,12 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
     }
 
     fun doSave(item: MediaItem) {
-        val e = edits[item.id] ?: return
+        val e = edits[item.id]?.takeIf { it.base == item.modified } ?: return
         scope.launch {
             try {
                 ImageEdit.save(ctx, item, e.rotation.roundToInt(), e.flip)
                 vm.toast("Đã lưu ảnh")
                 vm.reload()
-                delay(700)
-                edits.remove(item.id)
             } catch (ex: Exception) {
                 vm.toast("Không lưu được ảnh này")
             }
@@ -159,11 +162,14 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
             val item = items[page]
             val current = page == pager.currentPage
             if (item.isVideo) VideoPage(item, current, bars, onTap = { bars = !bars }, setBars = { bars = it })
-            else ImagePage(item, current, edits[item.id] ?: Edit()) { bars = !bars }
+            else ImagePage(
+                item, current, editOf(item),
+                onRotate = { d -> val e = editOf(item); edits[item.id] = e.copy(rotation = e.rotation + d) },
+            ) { bars = !bars }
         }
 
         val cur = items.getOrNull(pager.currentPage)
-        val edit = cur?.let { edits[it.id] }
+        val edit = cur?.let { c -> edits[c.id]?.takeIf { it.base == c.modified } }
         AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
             Row(
                 Modifier.fillMaxWidth().background(Color(0x99000000)).statusBarsPadding().padding(horizontal = 4.dp, vertical = 2.dp),
@@ -203,12 +209,12 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
             ) {
                 if (cur != null && !cur.isVideo) {
                     IconBtn(Icons.Outlined.RotateRight, "Xoay", tint = Color.White) {
-                        val e = edits[cur.id] ?: Edit()
+                        val e = editOf(cur)
                         // Khi đang lật, xoay theo chiều ngược lại để trên màn hình vẫn là xoay phải
                         edits[cur.id] = e.copy(rotation = e.rotation + if (e.flip) -90f else 90f)
                     }
                     IconBtn(Icons.Outlined.Flip, "Lật ngang", tint = Color.White) {
-                        val e = edits[cur.id] ?: Edit()
+                        val e = editOf(cur)
                         edits[cur.id] = e.copy(flip = !e.flip)
                     }
                 }
@@ -223,13 +229,9 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
                     val open = Intent(Intent.ACTION_VIEW).setDataAndType(cur.uri, cur.mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     try { ctx.startActivity(Intent.createChooser(open, "Mở bằng")) } catch (_: Exception) { vm.toast("Không có app nào mở được") }
                 }
-                IconBtn(Icons.Outlined.DeleteOutline, "Xoá", tint = Color.White) {
-                    cur ?: return@IconBtn
-                    try {
-                        val pi = MediaStore.createTrashRequest(ctx.contentResolver, listOf(cur.uri), true)
-                        trash.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-                    } catch (_: Exception) { vm.toast("Không xoá được ảnh này") }
-                }
+                IconBtn(Icons.Outlined.ContentCopy, "Copy tới…", tint = Color.White) { cur?.let { vm.startCopyMove(listOf(it), move = false) } }
+                IconBtn(Icons.AutoMirrored.Outlined.DriveFileMove, "Di chuyển tới…", tint = Color.White) { cur?.let { vm.startCopyMove(listOf(it), move = true) } }
+                IconBtn(Icons.Outlined.DeleteOutline, "Xoá", tint = Color.White) { cur?.let { vm.requestDelete(listOf(it)) } }
             }
         }
     }
@@ -267,15 +269,44 @@ private fun fmtDate(ms: Long): String = SimpleDateFormat("dd/MM/yyyy HH:mm", Loc
 // ------------------------------------------------------------------ Ảnh
 
 @Composable
-private fun ImagePage(item: MediaItem, isCurrent: Boolean, edit: Edit, onTap: () -> Unit) {
+private fun ImagePage(item: MediaItem, isCurrent: Boolean, edit: Edit, onRotate: (Float) -> Unit, onTap: () -> Unit) {
     val z = rememberZoomState(item.id)
     val scope = rememberCoroutineScope()
     LaunchedEffect(isCurrent) { if (!isCurrent) z.reset() }
-    val rot by animateFloatAsState(edit.rotation, tween(320, easing = FastOutSlowInEasing), label = "rot")
-    val flipX by animateFloatAsState(if (edit.flip) -1f else 1f, tween(320, easing = FastOutSlowInEasing), label = "flip")
+    // Góc xoay đã chốt (animation mượt khi bấm nút Xoay hoặc khi thả tay xoay 2 ngón)
+    val rotA = remember(item.id) { Animatable(edit.rotation) }
+    var lastMod by remember(item.id) { mutableLongStateOf(item.modified) }
+    LaunchedEffect(edit.rotation, item.modified) {
+        if (item.modified != lastMod) { lastMod = item.modified; rotA.snapTo(edit.rotation) }
+        else rotA.animateTo(edit.rotation, tween(320, easing = FastOutSlowInEasing))
+    }
+    val flipA = remember(item.id) { Animatable(if (edit.flip) -1f else 1f) }
+    var lastModFlip by remember(item.id) { mutableLongStateOf(item.modified) }
+    LaunchedEffect(edit.flip, item.modified) {
+        val t = if (edit.flip) -1f else 1f
+        if (item.modified != lastModFlip) { lastModFlip = item.modified; flipA.snapTo(t) } else flipA.animateTo(t, tween(320, easing = FastOutSlowInEasing))
+    }
+    val flipX = flipA.value
+    val sign = if (edit.flip) -1f else 1f
+    val rot = rotA.value + sign * z.freeRotation
     var intrinsic by remember(item.id, item.modified) { mutableStateOf(Size.Unspecified) }
 
-    BoxWithConstraints(Modifier.fillMaxSize().zoomGestures(z, scope, onTap)) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().zoomGestures(
+            z, scope,
+            onRotateEnd = { free ->
+                // Thả tay: tự bắt về góc 90° gần nhất
+                val snap = (free / 90f).roundToInt() * 90f
+                scope.launch {
+                    rotA.snapTo(rotA.value + sign * free)
+                    z.freeRotation = 0f
+                    if (snap != 0f) onRotate(sign * snap)
+                    else rotA.animateTo(edit.rotation, tween(260, easing = FastOutSlowInEasing))
+                }
+            },
+            onTap = onTap,
+        ),
+    ) {
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
         // Hệ số thu nhỏ để ảnh xoay vẫn nằm gọn trong khung
@@ -298,6 +329,22 @@ private fun ImagePage(item: MediaItem, isCurrent: Boolean, edit: Edit, onTap: ()
                 .graphicsLayer { scaleX = flipX }
                 .graphicsLayer { rotationZ = rot; scaleX = k; scaleY = k },
         )
+        ZoomBadge(z, rot - edit.rotation, Modifier.align(Alignment.Center))
+    }
+}
+
+/** Số % zoom (và góc xoay khi đang xoay 2 ngón) hiện giữa màn hình rồi tự ẩn. */
+@Composable
+fun ZoomBadge(z: ZoomState, rotating: Float = 0f, modifier: Modifier = Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(z.zoomEvent) { if (z.zoomEvent > 0) { visible = true; delay(900); visible = false } }
+    val showRot = abs(z.freeRotation) > 0.5f
+    AnimatedVisibility(visible || showRot, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        Text(
+            if (showRot) "${((z.freeRotation % 360)).roundToInt()}°" else "${(z.scale * 100).roundToInt()}%",
+            color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0x99000000)).padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 
@@ -312,6 +359,7 @@ private fun VideoPage(item: MediaItem, isCurrent: Boolean, bars: Boolean, onTap:
     LaunchedEffect(isCurrent) { if (!isCurrent) z.reset() }
 
     Box(Modifier.fillMaxSize().zoomGestures(z, scope, onTap), contentAlignment = Alignment.Center) {
+        ZoomBadge(z, modifier = Modifier.align(Alignment.Center))
         if (playing) {
             VideoPlayer(item, z, bars, setBars)
         } else {

@@ -1,10 +1,13 @@
-## M Photo v1.1.2 · 08/11/2026
+## M Photo v1.2.0 · 08/11/2026
+
+### Mới
+- Chọn nhiều ảnh/video: giữ lâu 1 ảnh trong thư mục, chạm thêm để chọn tiếp, có nút Chọn tất cả
+- Copy, Di chuyển, Xoá, Chia sẻ nhiều ảnh/video cùng lúc; chọn thư mục đích hoặc tạo thư mục mới
+- Copy / Di chuyển ngay trong màn xem ảnh
+- Xoay ảnh bằng 2 ngón tay, thả tay ra ảnh tự bắt về góc 90° gần nhất
 
 ### Cải thiện
-- Tải bản cập nhật: tự dừng khi đã đủ dung lượng file, bị đứt mạng thì tải tiếp phần còn thiếu thay vì tải lại từ đầu
-- Cài bản cập nhật bằng trình cài đặt chính thức của Android
+- Zoom tối đa 1000%, chạm 2 lần phóng lên 300%
+- Hiện số % khi zoom và số độ khi xoay
 
-### Sửa lỗi
-- Sửa lỗi tải bản cập nhật bị đứng ở cuối (100%) trên một số mạng
-
-**Cập nhật:** mở M Photo › bấm nút cập nhật. Nếu bản đang dùng cũ hơn v1.1.2 thì cài tay file `MPhoto-v1.1.2.apk` bên dưới.
+**Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay). Hoặc tải `MPhoto-v1.2.0.apk` bên dưới.

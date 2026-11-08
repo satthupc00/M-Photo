@@ -96,6 +96,7 @@ fun MPhotoRoot(vm: AppViewModel) {
 
         BackHandler(enabled = vm.viewer == null && vm.sheetFolder == null) {
             when {
+                vm.selection.isNotEmpty() -> vm.clearSelection()
                 vm.search != null -> vm.search = null
                 vm.openFolder != null && !expanded -> vm.openFolder = null
                 vm.tab == Tab.Folder && vm.path.isNotEmpty() -> { vm.path = vm.path.dropLast(1); vm.openFolder = null }
@@ -107,6 +108,7 @@ fun MPhotoRoot(vm: AppViewModel) {
         vm.sheetFolder?.let { FolderSheet(vm, it, wide = expanded) }
         vm.viewer?.let { Viewer(vm, it) }
         Dialogs(vm)
+        FileOpsHost(vm)
         ToastHost(vm, bottom = if (!expanded && vm.viewer == null) NAV_H + 16.dp else 24.dp)
     }
 }
@@ -131,8 +133,11 @@ private fun Compact(vm: AppViewModel) {
             }
         }
         Column(Modifier.align(Alignment.BottomCenter)) {
-            Credit(Modifier.align(Alignment.End).padding(end = 10.dp, bottom = 6.dp))
-            BottomNav(vm)
+            if (vm.selection.isNotEmpty()) SelectionBar(vm)
+            else {
+                Credit(Modifier.align(Alignment.End).padding(end = 10.dp, bottom = 6.dp))
+                BottomNav(vm)
+            }
         }
     }
 }
@@ -236,7 +241,10 @@ private fun Expanded(vm: AppViewModel) {
                     val f = vm.openFolder?.let { vm.folders[it] }
                     AnimatedContent(f?.path, transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) }, label = "detail") { p ->
                         val ff = p?.let { vm.folders[it] }
-                        if (ff != null) FolderDetail(vm, ff, compact = false, bottomPad = 40.dp) { TopActions(vm) }
+                        if (ff != null) Box(Modifier.fillMaxSize()) {
+                            FolderDetail(vm, ff, compact = false, bottomPad = 96.dp) { TopActions(vm) }
+                            if (vm.selection.isNotEmpty()) Box(Modifier.align(Alignment.BottomCenter)) { SelectionBar(vm) }
+                        }
                         else Column(Modifier.fillMaxSize()) {
                             TopBar("") { TopActions(vm) }
                             EmptyDetail()

@@ -1,9 +1,12 @@
-{ "version": "1.1.2", "date": "2026-11-08",
-  "new": [],
-  "improved": [
-    "Tải bản cập nhật: tự dừng khi đã đủ dung lượng file, bị đứt mạng thì tải tiếp phần còn thiếu thay vì tải lại từ đầu",
-    "Cài bản cập nhật bằng trình cài đặt chính thức của Android"
+{ "version": "1.2.0", "date": "2026-11-08",
+  "new": [
+    "Chọn nhiều ảnh/video: giữ lâu 1 ảnh trong thư mục, chạm thêm để chọn tiếp, có nút Chọn tất cả",
+    "Copy, Di chuyển, Xoá, Chia sẻ nhiều ảnh/video cùng lúc; chọn thư mục đích hoặc tạo thư mục mới",
+    "Copy / Di chuyển ngay trong màn xem ảnh",
+    "Xoay ảnh bằng 2 ngón tay, thả tay ra ảnh tự bắt về góc 90° gần nhất"
   ],
-  "fixed": [
-    "Sửa lỗi tải bản cập nhật bị đứng ở cuối (100%) trên một số mạng"
-  ] }
+  "improved": [
+    "Zoom tối đa 1000%, chạm 2 lần phóng lên 300%",
+    "Hiện số % khi zoom và số độ khi xoay"
+  ],
+  "fixed": [] }

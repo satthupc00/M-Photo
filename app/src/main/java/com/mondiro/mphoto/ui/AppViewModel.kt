@@ -41,6 +41,8 @@ class Node(
 )
 
 data class ViewerState(val folder: String, val index: Int)
+data class PickerReq(val items: List<MediaItem>, val move: Boolean)
+class PermReq(val sender: android.content.IntentSender, val onGranted: () -> Unit)
 data class ToastMsg(val text: String, val id: Long = System.nanoTime())
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -172,6 +174,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun toast(t: String) { toast = ToastMsg(t) }
 
     fun selectTab(t: Tab) {
+        clearSelection()
         if (tab == t && t == Tab.Folder) path = emptyList()
         tab = t; openFolder = null; search = null
     }
@@ -308,4 +311,73 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Lỗi tải: hiện hộp thoại cho tải bằng trình duyệt. */
     var updateError by mutableStateOf<Release?>(null)
     var updateErrorText by mutableStateOf("")
+
+    // ---------------- chọn nhiều + copy / di chuyển / xoá ----------------
+    var selection by mutableStateOf<Set<Long>>(emptySet())
+    var selectionFolder by mutableStateOf<String?>(null)
+    var picker by mutableStateOf<PickerReq?>(null)
+    var permissionRequest by mutableStateOf<PermReq?>(null)
+    var busy by mutableStateOf<String?>(null)
+
+    fun toggleSelect(folder: String, id: Long) {
+        if (selectionFolder != folder) { selection = emptySet(); selectionFolder = folder }
+        selection = if (id in selection) selection - id else selection + id
+    }
+    fun selectAll(f: Folder) {
+        selectionFolder = f.path
+        selection = if (selection.size == f.count) emptySet() else f.items.map { it.id }.toSet()
+    }
+    fun clearSelection() { selection = emptySet(); selectionFolder = null }
+    fun selectedItems(): List<MediaItem> = folders[selectionFolder]?.items?.filter { it.id in selection }.orEmpty()
+
+    fun requestDelete(items: List<MediaItem>) {
+        if (items.isEmpty()) return
+        try {
+            val pi = MediaStore.createTrashRequest(getApplication<Application>().contentResolver, items.map { it.uri }, true)
+            permissionRequest = PermReq(pi.intentSender) {
+                toast("Đã chuyển ${items.size} mục vào thùng rác")
+                clearSelection(); reload()
+            }
+        } catch (e: Exception) { toast("Không xoá được") }
+    }
+
+    fun startCopyMove(items: List<MediaItem>, move: Boolean) {
+        if (items.isNotEmpty()) picker = PickerReq(items, move)
+    }
+
+    fun performCopyMove(req: PickerReq, destRaw: String) {
+        picker = null
+        val dest = com.mondiro.mphoto.data.FileOps.normalize(destRaw)
+        val bad = req.items.filter { !com.mondiro.mphoto.data.FileOps.canPlace(dest, it.isVideo) }
+        if (dest.isEmpty() || bad.isNotEmpty()) {
+            toast(if (bad.any { it.isVideo }) "Video chỉ chép được vào DCIM, Movies, Pictures, Download" else "Ảnh chỉ chép được vào DCIM, Pictures, Download")
+            return
+        }
+        val items = req.items.filter { it.folder != dest }
+        if (items.isEmpty()) { toast("Đã ở sẵn trong thư mục này"); return }
+        val run: () -> Unit = {
+            viewModelScope.launch {
+                var ok = 0; var fail = 0
+                items.forEachIndexed { i, it ->
+                    busy = (if (req.move) "Đang di chuyển " else "Đang chép ") + "${i + 1}/${items.size}…"
+                    try {
+                        if (req.move) com.mondiro.mphoto.data.FileOps.move(getApplication(), it, dest)
+                        else com.mondiro.mphoto.data.FileOps.copy(getApplication(), it, dest)
+                        ok++
+                    } catch (e: Exception) { fail++ }
+                }
+                busy = null
+                clearSelection()
+                reload()
+                val verb = if (req.move) "di chuyển" else "chép"
+                toast(if (fail == 0) "Đã $verb $ok mục vào ${dest.substringAfterLast('/')}" else "Đã $verb $ok mục, lỗi $fail mục")
+            }
+        }
+        if (req.move) {
+            try {
+                val pi = MediaStore.createWriteRequest(getApplication<Application>().contentResolver, items.map { it.uri })
+                permissionRequest = PermReq(pi.intentSender, run)
+            } catch (e: Exception) { toast("Không di chuyển được") }
+        } else run()
+    }
 }
