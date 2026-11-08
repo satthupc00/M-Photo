@@ -279,6 +279,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 upd = UpdState.Available(r)
+                updateErrorText = "Lỗi tải: " + (e.message ?: Updater.describe(e))
                 updateError = r
                 return@launch
             }
@@ -293,7 +294,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else { pendingApk = f; toast("Bật \"Cho phép từ nguồn này\" cho M Photo rồi quay lại") }
         } catch (e: Exception) {
             pendingApk = null
-            toast("Không mở được trình cài đặt")
+            updateErrorText = "Lỗi cài: " + Updater.describe(e)
             (upd as? UpdState.Available)?.let { updateError = it.release }
         }
     }
@@ -306,4 +307,5 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Lỗi tải: hiện hộp thoại cho tải bằng trình duyệt. */
     var updateError by mutableStateOf<Release?>(null)
+    var updateErrorText by mutableStateOf("")
 }

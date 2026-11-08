@@ -334,7 +334,15 @@ fun Dialogs(vm: AppViewModel) {
             onDismissRequest = { vm.updateError = null },
             containerColor = Mc.panel,
             title = { Text("Không tải được bản cập nhật", fontWeight = FontWeight.Bold) },
-            text = { Text("Kiểm tra mạng rồi thử lại, hoặc tải file cài v${r.version} bằng trình duyệt rồi mở file để cài.", color = Mc.text, fontSize = 14.sp) },
+            text = {
+                Column {
+                    Text("Kiểm tra mạng rồi thử lại, hoặc tải file cài v${r.version} bằng trình duyệt rồi mở file để cài.", color = Mc.text, fontSize = 14.sp)
+                    if (vm.updateErrorText.isNotBlank()) Text(
+                        vm.updateErrorText, color = Mc.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            },
             confirmButton = {
                 TextButton({ vm.updateError = null; vm.downloadAndInstall(r) }) { Text("Thử lại", color = Mc.green, fontWeight = FontWeight.Bold) }
             },
