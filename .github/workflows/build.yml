@@ -3,7 +3,6 @@ name: Build APK
 on:
   push:
     branches: ["**"]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +22,7 @@ jobs:
         env:
           KS: ${{ secrets.MPHOTO_KEYSTORE_B64 }}
         run: |
-          if [ -n "$KS" ]; then mkdir -p keystore && echo "$KS" | base64 -d > keystore/mphoto.jks; else echo "::warning::No signing key secret, using debug key"; fi
+          if [ -n "$KS" ]; then mkdir -p keystore && echo "$KS" | base64 -d > keystore/mphoto.jks && echo "MPHOTO_SIGNED=true" >> $GITHUB_ENV; else echo "::warning::No signing key secret, using debug key"; fi
       - name: Build release APK
         env:
           MPHOTO_KEY_PASSWORD: ${{ secrets.MPHOTO_KEY_PASSWORD }}
@@ -40,10 +39,22 @@ jobs:
         with:
           name: MPhoto-v${{ env.VER }}
           path: out/*.apk
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Check if this version is already released
+        id: rel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${VER}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Publish GitHub Release (new version only)
+        if: steps.rel.outputs.exists == 'false' && env.MPHOTO_SIGNED == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VER }}
+          target_commitish: ${{ github.sha }}
           name: M Photo v${{ env.VER }}
           body_path: release-notes.md
           files: out/*.apk

@@ -13,6 +13,6 @@ Tải file `MPhoto-vX.Y.Z.apk` ở mục **Releases** về điện thoại và m
 ## Phát hành bản mới
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`
 2. Cập nhật `app/src/main/assets/whatsnew.json` và `release-notes.md`
-3. Push tag `vX.Y.Z` → GitHub Actions tự build và tạo Release.
+3. Push lên GitHub → Actions tự build, thấy version mới thì tự tạo Release `vX.Y.Z`.
 
 Khoá ký APK nằm trong GitHub Secrets `MPHOTO_KEYSTORE_B64` và `MPHOTO_KEY_PASSWORD`.
