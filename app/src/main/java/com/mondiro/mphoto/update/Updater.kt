@@ -20,7 +20,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class Release(val version: String, val notes: String, val apkUrl: String?, val pageUrl: String)
+data class Release(val version: String, val notes: String, val apkUrl: String?, val pageUrl: String, val apkSize: Long = -1)
 
 sealed interface UpdState {
     data object Idle : UpdState
@@ -47,15 +47,17 @@ object Updater {
             val o = JSONObject(c.inputStream.bufferedReader().readText())
             val assets = o.optJSONArray("assets")
             var apk: String? = null
+            var size = -1L
             if (assets != null) for (i in 0 until assets.length()) {
                 val a = assets.getJSONObject(i)
-                if (a.optString("name").endsWith(".apk")) { apk = a.optString("browser_download_url"); break }
+                if (a.optString("name").endsWith(".apk")) { apk = a.optString("browser_download_url"); size = a.optLong("size", -1); break }
             }
             Release(
                 version = o.optString("tag_name").removePrefix("v"),
                 notes = o.optString("body"),
                 apkUrl = apk,
                 pageUrl = o.optString("html_url"),
+                apkSize = size,
             )
         } finally {
             c.disconnect()
@@ -72,15 +74,18 @@ object Updater {
         return false
     }
 
-    /** Tải APK: thử DownloadManager của Android trước, hỏng thì tải trực tiếp. Lỗi sẽ ghi rõ nguyên nhân của cả 2 cách. */
-    suspend fun download(context: Context, url: String, version: String, onProgress: suspend (Float) -> Unit): File {
+    /**
+     * Tải APK. Cách 1: tải trực tiếp, dừng ngay khi đủ dung lượng (một số mạng giữ kết nối không đóng ở cuối file),
+     * bị đứt thì tải tiếp phần còn thiếu. Cách 2: DownloadManager của Android. Lỗi sẽ ghi rõ nguyên nhân cả 2 cách.
+     */
+    suspend fun download(context: Context, url: String, version: String, expectedSize: Long, onProgress: suspend (Float) -> Unit): File {
         val e1 = try {
-            return downloadWithManager(context, url, version, onProgress)
+            return downloadDirect(context, url, version, expectedSize, onProgress)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) { e }
         try {
-            return downloadDirect(context, url, version, onProgress)
+            return downloadWithManager(context, url, version, onProgress)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e2: Exception) {
@@ -102,6 +107,8 @@ object Updater {
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationUri(Uri.fromFile(dest))
         val id = dm.enqueue(req)
+        var lastBytes = -1L
+        var stallSince = System.currentTimeMillis()
         try {
             while (true) {
                 delay(400)
@@ -117,6 +124,8 @@ object Updater {
                     }
                 } ?: throw IllegalStateException("tải bị huỷ")
                 if (row[2] > 0) onProgress(row[1].toFloat() / row[2])
+                if (row[1] != lastBytes) { lastBytes = row[1]; stallSince = System.currentTimeMillis() }
+                else if (System.currentTimeMillis() - stallSince > 25000) { dm.remove(id); throw IllegalStateException("DownloadManager đứng ở ${row[1]}/${row[2]}") }
                 when (row[0].toInt()) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
                         if (!dest.exists() || dest.length() == 0L) throw IllegalStateException("file tải về trống")
@@ -130,50 +139,78 @@ object Updater {
         }
     }
 
-    private suspend fun downloadDirect(context: Context, url: String, version: String, onProgress: suspend (Float) -> Unit): File {
-        val dir = File(context.filesDir, "updates").apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }
-        val out = File(dir, "MPhoto-v$version.apk")
-        var progress = 0f
-        val job = withContext(Dispatchers.IO) {
-            var u = url
-            var conn: HttpURLConnection? = null
-            var hops = 0
-            while (true) {
-                conn = (URL(u).openConnection() as HttpURLConnection).apply {
-                    instanceFollowRedirects = false
-                    connectTimeout = 15000; readTimeout = 30000
-                    setRequestProperty("User-Agent", "MPhoto-Android")
-                    setRequestProperty("Accept", "application/octet-stream")
-                }
-                val code = conn!!.responseCode
-                if (code in 300..399) {
-                    val loc = conn!!.getHeaderField("Location") ?: throw IllegalStateException("chuyển hướng thiếu địa chỉ")
-                    conn!!.disconnect()
-                    u = URL(URL(u), loc).toString()
-                    if (++hops > 6) throw IllegalStateException("chuyển hướng quá nhiều")
-                    continue
-                }
-                if (code != 200) throw IllegalStateException("HTTP $code")
-                break
-            }
-            val c = conn!!
-            val total = c.contentLengthLong
-            c.inputStream.use { input ->
-                out.outputStream().use { o ->
-                    val buf = ByteArray(64 * 1024); var done = 0L
-                    while (true) {
-                        val n = input.read(buf); if (n < 0) break
-                        o.write(buf, 0, n); done += n
-                        if (total > 0) progress = done.toFloat() / total
+    private suspend fun downloadDirect(context: Context, url: String, version: String, expectedSize: Long, onProgress: suspend (Float) -> Unit): File =
+        withContext(Dispatchers.IO) {
+            val dir = File(context.filesDir, "updates").apply { mkdirs() }
+            dir.listFiles()?.forEach { it.delete() }
+            val out = File(dir, "MPhoto-v$version.apk")
+            var total = expectedSize
+            var lastErr: Exception? = null
+            var lastReported = -1
+            for (attempt in 1..8) {
+                val have = out.length()
+                if (total > 0 && have >= total) break
+                try {
+                    val c = open(url, if (have > 0) have else -1)
+                    val code = c.responseCode
+                    val append = have > 0 && code == 206
+                    if (code != 200 && code != 206) throw IllegalStateException("HTTP $code")
+                    if (total <= 0) {
+                        val len = c.contentLengthLong
+                        total = if (len > 0) (if (append) have + len else len) else -1
                     }
+                    var done = if (append) have else 0L
+                    c.inputStream.use { input ->
+                        java.io.FileOutputStream(out, append).use { o ->
+                            val buf = ByteArray(64 * 1024)
+                            while (true) {
+                                // Đủ dung lượng thì dừng luôn, không chờ máy chủ đóng kết nối
+                                if (total > 0 && done >= total) break
+                                val want = if (total > 0) minOf(buf.size.toLong(), total - done).toInt() else buf.size
+                                val n = input.read(buf, 0, want)
+                                if (n < 0) break
+                                o.write(buf, 0, n); done += n
+                                if (total > 0) {
+                                    val pct = (done * 100 / total).toInt()
+                                    if (pct != lastReported) { lastReported = pct; withContext(Dispatchers.Main) { onProgress(pct / 100f) } }
+                                }
+                            }
+                        }
+                    }
+                    c.disconnect()
+                    if (total <= 0 || out.length() >= total) break
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lastErr = e
+                    kotlinx.coroutines.delay(1000L * attempt)
                 }
             }
-            c.disconnect()
+            if (total > 0 && out.length() < total) throw IllegalStateException("tải được ${out.length()}/$total byte" + (lastErr?.let { " · " + describe(it) } ?: ""))
+            if (out.length() == 0L) throw lastErr ?: IllegalStateException("file tải về trống")
             out
         }
-        onProgress(progress)
-        return job
+
+    /** Mở kết nối, tự theo chuyển hướng của GitHub; from >= 0 thì xin tải tiếp từ byte đó. */
+    private fun open(url: String, from: Long): HttpURLConnection {
+        var u = url
+        repeat(7) {
+            val c = (URL(u).openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                connectTimeout = 15000; readTimeout = 12000
+                setRequestProperty("User-Agent", "MPhoto-Android")
+                setRequestProperty("Accept", "application/octet-stream")
+                setRequestProperty("Accept-Encoding", "identity")
+                if (from > 0) setRequestProperty("Range", "bytes=$from-")
+            }
+            val code = c.responseCode
+            if (code in 300..399) {
+                val loc = c.getHeaderField("Location") ?: throw IllegalStateException("chuyển hướng thiếu địa chỉ")
+                c.disconnect()
+                u = URL(URL(u), loc).toString()
+            } else return c
+        }
+        throw IllegalStateException("chuyển hướng quá nhiều")
     }
 
     /** Trả về false nếu cần người dùng cấp quyền "cài app không rõ nguồn" trước. */

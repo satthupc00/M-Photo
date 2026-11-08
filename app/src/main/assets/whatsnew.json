@@ -1,9 +1,9 @@
-{ "version": "1.1.1", "date": "2026-11-08",
+{ "version": "1.1.2", "date": "2026-11-08",
   "new": [],
   "improved": [
-    "Cài bản cập nhật bằng trình cài đặt chính thức của Android",
-    "Tải bản cập nhật có 2 cách dự phòng; nếu lỗi sẽ hiện rõ nguyên nhân"
+    "Tải bản cập nhật: tự dừng khi đã đủ dung lượng file, bị đứt mạng thì tải tiếp phần còn thiếu thay vì tải lại từ đầu",
+    "Cài bản cập nhật bằng trình cài đặt chính thức của Android"
   ],
   "fixed": [
-    "Sửa lỗi \"Không tải được bản cập nhật\""
+    "Sửa lỗi tải bản cập nhật bị đứng ở cuối (100%) trên một số mạng"
   ] }
