@@ -1,0 +1,50 @@
+name: Build APK
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore signing key
+        env:
+          KS: ${{ secrets.MPHOTO_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then mkdir -p keystore && echo "$KS" | base64 -d > keystore/mphoto.jks; else echo "::warning::No signing key secret, using debug key"; fi
+      - name: Build release APK
+        env:
+          MPHOTO_KEY_PASSWORD: ${{ secrets.MPHOTO_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+      - name: Rename APK
+        run: |
+          VER=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk "out/MPhoto-v${VER}.apk"
+          echo "VER=${VER}" >> $GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MPhoto-v${{ env.VER }}
+          path: out/*.apk
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: M Photo v${{ env.VER }}
+          body_path: release-notes.md
+          files: out/*.apk
+          make_latest: true
