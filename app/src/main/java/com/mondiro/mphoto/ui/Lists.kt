@@ -70,12 +70,15 @@ fun AlbumGrid(vm: AppViewModel, folders: List<Folder>, fixedCols: Int?, bottomPa
     }
     val pins = if (searching) emptyList() else folders.filter { it.path in vm.pinned }
     val rest = if (searching) folders else folders.filter { it.path !in vm.pinned }
+    val size = vm.albumSize
     LazyVerticalGrid(
         state = gridState,
-        columns = if (fixedCols != null) GridCells.Fixed(fixedCols) else GridCells.Adaptive(150.dp),
+        flingBehavior = rememberFastFling(vm.scrollSpeed),
+        columns = if (fixedCols != null) GridCells.Fixed(when (size) { 0 -> fixedCols + 2; 1 -> fixedCols + 1; else -> fixedCols })
+        else GridCells.Adaptive(when (size) { 0 -> 88.dp; 1 -> 112.dp; else -> 150.dp }),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = bottomPad),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (size == 0) 8.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (size == 0) 6.dp else 10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         if (pins.isNotEmpty()) {
@@ -107,12 +110,13 @@ fun AlbumCard(vm: AppViewModel, f: Folder, modifier: Modifier = Modifier) {
             if (hidden) Badge(Modifier.align(Alignment.TopEnd)) { Icon(Icons.Outlined.VisibilityOff, null, tint = Color.White, modifier = Modifier.size(15.dp)) }
             if (f.path in vm.gsync) Badge(Modifier.align(Alignment.BottomEnd)) { Icon(Icons.Outlined.CloudUpload, null, tint = Mc.green, modifier = Modifier.size(15.dp)) }
         }
+        val small = vm.albumSize == 0
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).padding(start = 4.dp, top = 6.dp)) {
-                Text(f.name, color = Mc.text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(countLabel(f.count, f.videoCount), color = Mc.muted, fontSize = 12.sp, maxLines = 1)
+            Column(Modifier.weight(1f).padding(start = if (small) 2.dp else 4.dp, top = if (small) 4.dp else 6.dp)) {
+                Text(f.name, color = Mc.text, fontWeight = FontWeight.SemiBold, fontSize = if (small) 12.sp else 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (small) fmtCount(f.count) else countLabel(f.count, f.videoCount), color = Mc.muted, fontSize = if (small) 10.5.sp else 12.sp, maxLines = 1)
             }
-            IconBtn(Icons.Outlined.MoreVert, "Tuỳ chọn", tint = Mc.muted, modifier = Modifier.size(36.dp)) { vm.sheetFolder = f.path }
+            if (vm.albumSize == 2) IconBtn(Icons.Outlined.MoreVert, "Tuỳ chọn", tint = Mc.muted, modifier = Modifier.size(36.dp)) { vm.sheetFolder = f.path }
         }
     }
 }
@@ -170,6 +174,7 @@ fun FolderList(vm: AppViewModel, bottomPad: Dp) {
     }
     LazyColumn(
         state = vm.folderListState(vm.path.joinToString("/")),
+        flingBehavior = rememberFastFling(vm.scrollSpeed),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = bottomPad),
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -260,6 +265,7 @@ fun FolderDetail(vm: AppViewModel, f: Folder, compact: Boolean, bottomPad: Dp, a
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
         )
         LazyVerticalGrid(
+            flingBehavior = rememberFastFling(vm.scrollSpeed),
             columns = GridCells.Adaptive(if (compact) 88.dp else 112.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),

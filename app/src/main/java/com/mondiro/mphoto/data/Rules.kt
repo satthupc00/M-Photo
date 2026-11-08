@@ -90,6 +90,17 @@ class Prefs(context: Context) {
         get() = sp.getString("defaultTab", "album")!!
         set(v) = sp.edit().putString("defaultTab", v).apply()
 
+    var panSpeed: Float
+        get() = sp.getFloat("panSpeed", 1.5f)
+        set(v) = sp.edit().putFloat("panSpeed", v).apply()
+    var scrollSpeed: Float
+        get() = sp.getFloat("scrollSpeed", 2f)
+        set(v) = sp.edit().putFloat("scrollSpeed", v).apply()
+    /** Cỡ ô Album: 0 nhỏ, 1 vừa, 2 to. */
+    var albumSize: Int
+        get() = sp.getInt("albumSize", 2)
+        set(v) = sp.edit().putInt("albumSize", v).apply()
+
     var rules: List<UserRule>
         get() = try {
             val a = JSONArray(sp.getString("rules", "[]"))

@@ -36,7 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ViewModule
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -182,7 +184,10 @@ private fun MainPane(vm: AppViewModel, fixedCols: Int?, bottomPad: androidx.comp
             vm.tab == Tab.Folder && vm.path.isNotEmpty() -> TopBar(vm.path.last(), onBack = { vm.path = vm.path.dropLast(1); vm.openFolder = null }) { if (showActions) TopActions(vm) }
             else -> TopBar(
                 when (vm.tab) { Tab.Album -> "Album"; Tab.Folder -> "Thư mục"; Tab.Settings -> "Cài đặt" },
-            ) { if (showActions) TopActions(vm) }
+            ) {
+                if (vm.tab == Tab.Album) AlbumSizeButton(vm)
+                if (showActions) TopActions(vm)
+            }
         }
         if (vm.tab == Tab.Folder && vm.search == null) Crumbs(vm)
         Box(Modifier.weight(1f)) {
@@ -309,5 +314,16 @@ private fun PermissionScreen(onRequest: () -> Unit) {
             )
         }
         Credit(Modifier.align(Alignment.BottomEnd))
+    }
+}
+
+/** Nút đổi cỡ ô Album: To -> Vừa -> Nhỏ -> To. */
+@Composable
+private fun AlbumSizeButton(vm: AppViewModel) {
+    val icon = when (vm.albumSize) { 0 -> Icons.Outlined.Apps; 1 -> Icons.Outlined.ViewModule; else -> Icons.Outlined.GridView }
+    IconBtn(icon, "Cỡ ô Album") {
+        val next = if (vm.albumSize == 0) 2 else vm.albumSize - 1
+        vm.setAlbumSize(next)
+        vm.toast("Cỡ ô: " + when (next) { 0 -> "Nhỏ"; 1 -> "Vừa"; else -> "To" })
     }
 }

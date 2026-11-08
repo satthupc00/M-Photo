@@ -313,7 +313,8 @@ private fun ImagePage(item: MediaItem, isCurrent: Boolean, edit: Edit, onRotate:
         val k = if (intrinsic.isSpecified && intrinsic.width > 0 && intrinsic.height > 0 && w > 0 && h > 0) {
             val fs = min(w / intrinsic.width, h / intrinsic.height)
             val fw = intrinsic.width * fs; val fh = intrinsic.height * fs
-            val rad = Math.toRadians(rot.toDouble())
+            // Tính khung vừa theo góc đã chốt (không theo góc đang xoay tay) để tâm xoay giữa 2 ngón không bị trôi
+            val rad = Math.toRadians(rotA.value.toDouble())
             val c = abs(cos(rad)).toFloat(); val s = abs(sin(rad)).toFloat()
             val bw = fw * c + fh * s; val bh = fw * s + fh * c
             min(w / bw, h / bh) / min(w / fw, h / fh)

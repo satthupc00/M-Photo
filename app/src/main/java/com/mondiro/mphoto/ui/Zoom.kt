@@ -31,7 +31,13 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.exp
 
-const val MAX_ZOOM = 10f
+/** Tốc độ pan / cuộn lấy từ Cài đặt (dùng chung cho mọi màn hình). */
+object UiPrefs {
+    @Volatile var pan = 1.5f
+}
+
+const val MAX_ZOOM = 30f
+const val MIN_ZOOM = 0.25f
 const val DOUBLE_TAP_ZOOM = 3f
 
 /** Trạng thái phóng to / kéo của 1 ảnh hoặc video trong trình xem. */
@@ -47,6 +53,8 @@ class ZoomState(private val scope: CoroutineScope) {
     var touching by mutableStateOf(false)
     /** Tăng mỗi lần mức zoom đổi, để hiện số % rồi tự ẩn. */
     var zoomEvent by mutableStateOf(0)
+    /** Hệ số tốc độ kéo (pan), chỉnh trong Cài đặt. */
+    val panFactor: Float get() = UiPrefs.pan
     private var anim: Job? = null
 
     val zoomed: Boolean get() = scale > 1.02f
@@ -58,7 +66,7 @@ class ZoomState(private val scope: CoroutineScope) {
     }
 
     /** Phóng theo hệ số z quanh điểm f (toạ độ trong khung), giữ điểm f đứng yên dưới ngón tay. */
-    fun zoomBy(z: Float, f: Offset, pan: Offset = Offset.Zero, min: Float = 0.6f, max: Float = MAX_ZOOM) {
+    fun zoomBy(z: Float, f: Offset, pan: Offset = Offset.Zero, min: Float = MIN_ZOOM, max: Float = MAX_ZOOM, clamp: Boolean = true) {
         anim?.cancel()
         val ns = (scale * z).coerceIn(min, max)
         if (ns != scale) zoomEvent++
@@ -68,8 +76,21 @@ class ZoomState(private val scope: CoroutineScope) {
         val t = Offset(offsetX, offsetY)
         val nt = t * rz + fc * (1f - rz) + pan
         scale = ns
-        val cl = if (ns >= 1f) clamped(nt, ns) else nt
+        val cl = if (clamp && ns >= 1f) clamped(nt, ns) else nt
         offsetX = cl.x; offsetY = cl.y
+    }
+
+    /** Xoay quanh điểm f (giữa 2 ngón): dời ảnh để điểm dưới ngón tay đứng yên khi xoay. */
+    fun rotateAbout(deg: Float, f: Offset) {
+        if (deg == 0f) return
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val rad = Math.toRadians(deg.toDouble())
+        val cs = kotlin.math.cos(rad).toFloat(); val sn = kotlin.math.sin(rad).toFloat()
+        val v = Offset(offsetX, offsetY) + c - f
+        val rv = Offset(v.x * cs - v.y * sn, v.x * sn + v.y * cs)
+        val nt = (f - c) + rv
+        offsetX = nt.x; offsetY = nt.y
+        freeRotation += deg
     }
 
     fun panBy(p: Offset) {
@@ -99,8 +120,8 @@ class ZoomState(private val scope: CoroutineScope) {
     }
 
     fun settle() {
-        if (scale < 1f) animateTo(1f)
-        else if (scale > 1f) {
+        if (scale <= 1f) { if (offsetX != 0f || offsetY != 0f) animateTo(scale) }
+        else {
             val c = clamped(Offset(offsetX, offsetY), scale)
             if (c.x != offsetX || c.y != offsetY) animateTo(scale)
         }
@@ -159,12 +180,12 @@ fun Modifier.zoomGestures(
                         val step = ch.position.y - prevY
                         prevY = ch.position.y
                         z.touching = true
-                        z.zoomBy(exp(step / 200f), down.position, min = 1f)
+                        z.zoomBy(exp(step / 160f), down.position)
                         ch.consume()
                     }
                 }
                 if (!dragging) {
-                    if (z.zoomed) z.animateTo(1f) else z.animateTo(DOUBLE_TAP_ZOOM, down.position)
+                    if (abs(z.scale - 1f) > 0.02f) z.animateTo(1f) else z.animateTo(DOUBLE_TAP_ZOOM, down.position)
                 } else z.settle()
                 z.touching = false
                 return@awaitEachGesture
@@ -184,18 +205,19 @@ fun Modifier.zoomGestures(
                 if (pressed > 1) multi = true
                 if (multi && pressed > 1) {
                     z.touching = true
-                    if (onRotateEnd != null) {
-                        rotAcc += ev.calculateRotation()
-                        // Xoay quá 15° mới tính là xoay, tránh lỡ tay khi chỉ muốn zoom
-                        if (!rotating && abs(rotAcc) > 15f) rotating = true
-                        if (rotating) z.freeRotation = rotAcc
-                    }
-                    z.zoomBy(ev.calculateZoom(), ev.calculateCentroid(useCurrent = true), ev.calculatePan())
+                    val centroid = ev.calculateCentroid(useCurrent = true)
+                    val dRot = if (onRotateEnd != null) ev.calculateRotation() else 0f
+                    rotAcc += dRot
+                    // Xoay quá 15° mới tính là xoay, tránh lỡ tay khi chỉ muốn zoom
+                    val startRot = onRotateEnd != null && !rotating && abs(rotAcc) > 15f
+                    if (startRot) rotating = true
+                    z.zoomBy(ev.calculateZoom(), centroid, ev.calculatePan() * z.panFactor, clamp = !rotating)
+                    if (startRot) z.rotateAbout(rotAcc, centroid) else if (rotating) z.rotateAbout(dRot, centroid)
                     ev.changes.forEach { if (it.positionChanged()) it.consume() }
                     moved = true
                 } else if (z.zoomed && pressed == 1) {
                     val p = ev.calculatePan()
-                    if (p != Offset.Zero) { z.panBy(p); moved = moved || p.getDistance() > 0.5f }
+                    if (p != Offset.Zero) { z.panBy(p * z.panFactor); moved = moved || p.getDistance() > 0.5f }
                     ev.changes.forEach { if (it.positionChanged()) it.consume() }
                 } else if (!moved) {
                     val ch = ev.changes.first()

@@ -1,12 +1,12 @@
-{ "version": "1.2.0", "date": "2026-11-08",
+{ "version": "1.3.0", "date": "2026-11-08",
   "new": [
-    "Chọn nhiều ảnh/video: giữ lâu 1 ảnh trong thư mục, chạm thêm để chọn tiếp, có nút Chọn tất cả",
-    "Copy, Di chuyển, Xoá, Chia sẻ nhiều ảnh/video cùng lúc; chọn thư mục đích hoặc tạo thư mục mới",
-    "Copy / Di chuyển ngay trong màn xem ảnh",
-    "Xoay ảnh bằng 2 ngón tay, thả tay ra ảnh tự bắt về góc 90° gần nhất"
+    "Album có 3 cỡ ô: Nhỏ, Vừa, To (nút trên thanh Album hoặc trong Cài đặt)",
+    "Cài đặt › Tốc độ: chỉnh tốc độ kéo ảnh khi zoom và tốc độ cuộn danh sách"
   ],
   "improved": [
-    "Zoom tối đa 1000%, chạm 2 lần phóng lên 300%",
-    "Hiện số % khi zoom và số độ khi xoay"
+    "Xoay ảnh bằng 2 ngón: tâm xoay nằm giữa 2 ngón tay",
+    "Zoom tối đa 3000%, thu nhỏ được tới 25%",
+    "Kéo ảnh khi zoom nhanh hơn (mặc định x1.5)",
+    "Cuộn danh sách nhanh gấp đôi (mặc định x2)"
   ],
   "fixed": [] }

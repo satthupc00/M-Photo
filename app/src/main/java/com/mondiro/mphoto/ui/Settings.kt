@@ -32,7 +32,9 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.PanTool
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
@@ -60,6 +62,7 @@ import com.mondiro.mphoto.update.Updater
 fun SettingsScreen(vm: AppViewModel, bottomPad: Dp) {
     val ctx = LocalContext.current
     LazyColumn(
+        flingBehavior = rememberFastFling(vm.scrollSpeed),
         contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = bottomPad),
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -82,6 +85,19 @@ fun SettingsScreen(vm: AppViewModel, bottomPad: Dp) {
                             Chip("Thư mục", vm.defaultTab == "folder", Mc.red) { vm.setDefault("folder") }
                         }
                     })
+                    Item(Icons.Outlined.GridView, "Cỡ ô Album", null, trailing = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Chip("Nhỏ", vm.albumSize == 0, Mc.red) { vm.setAlbumSize(0) }
+                            Chip("Vừa", vm.albumSize == 1, Mc.red) { vm.setAlbumSize(1) }
+                            Chip("To", vm.albumSize == 2, Mc.red) { vm.setAlbumSize(2) }
+                        }
+                    })
+                }
+
+                GroupTitle("Tốc độ")
+                Group {
+                    SpeedRow(Icons.Outlined.PanTool, "Tốc độ kéo ảnh (pan)", "Khi đang zoom, kéo ảnh nhanh hơn", vm.panSpeed, 1f, 4f) { vm.setPan(it) }
+                    SpeedRow(Icons.Outlined.SwapVert, "Tốc độ cuộn danh sách", "Vuốt nhanh thì danh sách trôi xa hơn", vm.scrollSpeed, 1f, 4f) { vm.setScroll(it) }
                 }
 
                 GroupTitle("Loại trừ thư mục")
@@ -220,5 +236,32 @@ fun Switch(on: Boolean) {
     val x by animateDpAsState(if (on) 18.dp else 0.dp, spring(dampingRatio = 0.6f), label = "x")
     Box(Modifier.size(width = 42.dp, height = 24.dp).clip(RoundedCornerShape(12.dp)).background(bg).padding(3.dp)) {
         Box(Modifier.offset(x = x).size(18.dp).clip(CircleShape).background(Color.White))
+    }
+}
+
+/** Thanh trượt chỉnh tốc độ (bước 0.25x), hiện số "x1.50" bên phải. */
+@Composable
+private fun SpeedRow(icon: ImageVector, title: String, sub: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Mc.muted, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Mc.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(sub, color = Mc.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text("x" + "%.2f".format(value), color = Mc.red, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = { onChange((Math.round(it * 4f) / 4f).coerceIn(min, max)) },
+            valueRange = min..max,
+            steps = ((max - min) * 4).toInt() - 1,
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = Color.White, activeTrackColor = Mc.red, inactiveTrackColor = Color(0xFF474C55),
+                activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent,
+            ),
+            modifier = Modifier.padding(start = 34.dp),
+        )
     }
 }

@@ -245,3 +245,15 @@ fun imageRequest(item: MediaItem, maxSize: Int? = null): coil3.request.ImageRequ
             .build()
     }
 }
+
+/** Cuộn nhanh hơn: nhân tốc độ vuốt (fling) theo Cài đặt. */
+@Composable
+fun rememberFastFling(mult: Float): androidx.compose.foundation.gestures.FlingBehavior {
+    val base = androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
+    return remember(base, mult) {
+        object : androidx.compose.foundation.gestures.FlingBehavior {
+            override suspend fun androidx.compose.foundation.gestures.ScrollScope.performFling(initialVelocity: Float): Float =
+                with(base) { performFling(initialVelocity * mult) }
+        }
+    }
+}
