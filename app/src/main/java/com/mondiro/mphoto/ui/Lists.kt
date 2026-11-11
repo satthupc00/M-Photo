@@ -242,14 +242,14 @@ private fun NodeRow(
 // ------------------------------------------------------------------ Lưới ảnh 1 thư mục
 
 @Composable
-fun FolderDetail(vm: AppViewModel, f: Folder, compact: Boolean, bottomPad: Dp, actions: @Composable () -> Unit = {}) {
+fun FolderDetail(vm: AppViewModel, f: Folder, compact: Boolean, bottomPad: Dp, showBack: Boolean = compact, actions: @Composable () -> Unit = {}) {
     val selecting = vm.selection.isNotEmpty() && vm.selectionFolder == f.path
     androidx.activity.compose.BackHandler(enabled = selecting) { vm.clearSelection() }
     Column(Modifier.fillMaxSize()) {
         if (selecting) SelectionTopBar(vm, f.count) { vm.selectAll(f) }
         else TopBar(
             f.name,
-            onBack = if (compact) ({ vm.openFolder = null }) else null,
+            onBack = if (showBack) ({ vm.openFolder = null }) else null,
             star = f.path in vm.pinned,
             actions = {
                 IconBtn(Icons.Outlined.MoreVert, "Tuỳ chọn") { vm.sheetFolder = f.path }

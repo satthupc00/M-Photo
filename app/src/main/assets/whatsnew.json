@@ -1,6 +1,6 @@
-{ "version": "1.4.0", "date": "2026-11-08",
-  "new": [
-    "Xem video toàn màn hình: bấm nút mở rộng trên thanh điều khiển, video ngang tự xoay ngang máy"
+{ "version": "1.4.1", "date": "2026-11-11",
+  "new": [],
+  "improved": [
+    "Màn trong Z Fold 7: mở thư mục là xem ảnh toàn khung, không còn chia đôi danh sách thư mục và ảnh"
   ],
-  "improved": [],
   "fixed": [] }

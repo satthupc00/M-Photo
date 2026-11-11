@@ -112,9 +112,8 @@ fun MPhotoRoot(vm: AppViewModel) {
             when {
                 vm.selection.isNotEmpty() -> vm.clearSelection()
                 vm.search != null -> vm.search = null
-                vm.openFolder != null && !expanded -> vm.openFolder = null
-                vm.tab == Tab.Folder && vm.path.isNotEmpty() -> { vm.path = vm.path.dropLast(1); vm.openFolder = null }
                 vm.openFolder != null -> vm.openFolder = null
+                vm.tab == Tab.Folder && vm.path.isNotEmpty() -> { vm.path = vm.path.dropLast(1); vm.openFolder = null }
                 else -> (ctx.findActivity())?.moveTaskToBack(true)
             }
         }
@@ -250,27 +249,23 @@ private fun Expanded(vm: AppViewModel) {
                     Box(Modifier.weight(1f)) { SettingsScreen(vm, bottomPad = 40.dp) }
                 }
             } else {
-                Box(Modifier.width(350.dp).fillMaxHeight().statusBarsPadding()) {
-                    MainPane(vm, fixedCols = 2, bottomPad = 40.dp, showActions = false)
-                }
-                Box(Modifier.width(1.dp).fillMaxHeight().background(Mc.line))
-                Box(Modifier.weight(1f).fillMaxHeight().background(Mc.stage).statusBarsPadding()) {
-                    val f = vm.openFolder?.let { vm.folders[it] }
-                    AnimatedContent(f?.path, transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) }, label = "detail") { p ->
-                        val ff = p?.let { vm.folders[it] }
-                        if (ff != null) Box(Modifier.fillMaxSize()) {
-                            FolderDetail(vm, ff, compact = false, bottomPad = 96.dp) { TopActions(vm) }
-                            if (vm.selection.isNotEmpty()) Box(Modifier.align(Alignment.BottomCenter)) { SelectionBar(vm) }
-                        }
-                        else Column(Modifier.fillMaxSize()) {
-                            TopBar("") { TopActions(vm) }
-                            EmptyDetail()
-                        }
+                // Màn trong: mở thư mục là xem toàn khung, không chia đôi danh sách / ảnh
+                Box(Modifier.weight(1f).fillMaxHeight().statusBarsPadding()) {
+                    val open = vm.openFolder?.let { vm.folders[it] }
+                    AnimatedContent(
+                        targetState = if (open != null && vm.search == null) "d:" + open.path else "m:" + vm.tab,
+                        transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
+                        label = "screen",
+                    ) { key ->
+                        val f = if (key.startsWith("d:")) vm.folders[key.removePrefix("d:")] else null
+                        if (f != null) FolderDetail(vm, f, compact = false, showBack = true, bottomPad = 96.dp) { TopActions(vm) }
+                        else MainPane(vm, fixedCols = null, bottomPad = 48.dp, showActions = true)
                     }
+                    if (vm.selection.isNotEmpty()) Box(Modifier.align(Alignment.BottomCenter)) { SelectionBar(vm) }
                 }
             }
         }
-        Credit(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 10.dp, bottom = 8.dp))
+        if (vm.selection.isEmpty()) Credit(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 10.dp, bottom = 8.dp))
     }
 }
 

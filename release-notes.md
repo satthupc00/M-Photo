@@ -1,6 +1,6 @@
-## M Photo v1.4.0 · 08/11/2026
+## M Photo v1.4.1 · 11/11/2026
 
-### Mới
-- Xem video toàn màn hình: bấm nút mở rộng trên thanh điều khiển, video ngang tự xoay ngang máy
+### Cải thiện
+- Màn trong Z Fold 7: mở thư mục là xem ảnh toàn khung, không còn chia đôi danh sách thư mục và ảnh
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).
