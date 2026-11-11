@@ -360,8 +360,9 @@ private fun VideoPage(
     item: MediaItem, isCurrent: Boolean, bars: Boolean, full: Boolean, setFull: (Boolean) -> Unit,
     onTap: () -> Unit, setBars: (Boolean) -> Unit,
 ) {
-    var playing by remember(item.id) { mutableStateOf(false) }
-    LaunchedEffect(isCurrent) { if (!isCurrent) playing = false }
+    // Mở video (hoặc vuốt tới video) là tự phát
+    var playing by remember(item.id) { mutableStateOf(isCurrent) }
+    LaunchedEffect(isCurrent) { playing = isCurrent }
     val z = rememberZoomState(item.id)
     val scope = rememberCoroutineScope()
     LaunchedEffect(isCurrent) { if (!isCurrent) z.reset() }

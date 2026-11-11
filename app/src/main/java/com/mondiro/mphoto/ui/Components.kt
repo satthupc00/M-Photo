@@ -102,7 +102,7 @@ fun UpdateButton(vm: AppViewModel) {
                 .pressable {
                     when (st) {
                         is UpdState.Available -> vm.updateDialog = st.release
-                        is UpdState.Downloading -> vm.toast("Đang tải bản cập nhật… ${(st.progress * 100).toInt()}%")
+                        is UpdState.Downloading -> vm.toast("Đang tải… " + downloadLabel(st))
                         else -> vm.checkUpdate(manual = true)
                     }
                 },
@@ -256,4 +256,12 @@ fun rememberFastFling(mult: Float): androidx.compose.foundation.gestures.FlingBe
                 with(base) { performFling(initialVelocity * mult) }
         }
     }
+}
+
+/** "45% · 1.2 MB/s · còn 3 giây · từ máy chủ CDN" */
+fun downloadLabel(d: com.mondiro.mphoto.update.UpdState.Downloading): String = buildString {
+    append("${(d.progress * 100).toInt()}%")
+    if (d.speed > 0) append(" · " + if (d.speed >= 1_048_576) "%.1f MB/s".format(d.speed / 1048576.0) else "${d.speed / 1024} KB/s")
+    if (d.eta >= 0) append(" · còn " + if (d.eta >= 60) "${d.eta / 60} phút ${d.eta % 60} giây" else "${d.eta} giây")
+    if (d.source.isNotEmpty()) append(" · từ ${d.source}")
 }

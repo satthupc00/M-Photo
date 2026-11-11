@@ -360,6 +360,17 @@ fun Dialogs(vm: AppViewModel) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LinearProgressIndicator(progress = { s.progress }, color = Mc.green, trackColor = Color.Transparent, modifier = Modifier.fillMaxWidth())
         }
+        // Thẻ tiến trình tải: %, tốc độ, thời gian còn lại, máy chủ
+        Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 84.dp), contentAlignment = Alignment.BottomCenter) {
+            Column(
+                Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(14.dp)).background(Color(0xF233363D)).padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Text("Đang tải bản cập nhật", color = Mc.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(downloadLabel(s), color = Mc.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                LinearProgressIndicator(progress = { s.progress }, color = Mc.green, trackColor = Mc.line, modifier = Modifier.fillMaxWidth())
+            }
+        }
     }
 }
 

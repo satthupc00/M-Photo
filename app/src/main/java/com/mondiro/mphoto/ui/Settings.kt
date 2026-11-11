@@ -146,7 +146,7 @@ fun SettingsScreen(vm: AppViewModel, bottomPad: Dp) {
                             UpdState.Checking -> "Đang kiểm tra…"
                             UpdState.Latest -> "Đã là bản mới nhất"
                             is UpdState.Available -> "Có bản mới v${s.release.version}"
-                            is UpdState.Downloading -> "Đang tải… ${(s.progress * 100).toInt()}%"
+                            is UpdState.Downloading -> "Đang tải… " + downloadLabel(s)
                             UpdState.Error -> "Không kiểm tra được, thử lại sau"
                             UpdState.Idle -> "Tự kiểm tra khi mở app"
                         },

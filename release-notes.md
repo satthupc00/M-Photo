@@ -1,6 +1,11 @@
-## M Photo v1.4.1 · 11/11/2026
+## M Photo v1.4.2 · 11/11/2026
+
+### Mới
+- Video tự phát khi mở hoặc khi vuốt tới
+- Tải bản cập nhật hiện tốc độ, thời gian còn lại và máy chủ đang tải
 
 ### Cải thiện
-- Màn trong Z Fold 7: mở thư mục là xem ảnh toàn khung, không còn chia đôi danh sách thư mục và ảnh
+- Tải bản cập nhật nhanh hơn: thêm máy chủ CDN dự phòng, tự chuyển sang GitHub nếu CDN lỗi
+- Mạng bị đứng chỉ chờ 5 giây là tải tiếp (trước là 12 giây)
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).

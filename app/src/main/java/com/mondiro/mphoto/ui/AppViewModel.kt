@@ -287,7 +287,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             upd = UpdState.Downloading(0f)
             val f = try {
-                Updater.download(getApplication(), url, r.version, r.apkSize) { p -> upd = UpdState.Downloading(p) }
+                Updater.download(getApplication(), r) { p -> upd = p }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

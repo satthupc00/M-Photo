@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: ["**"]
+    branches: ["**", "!dist"]
   workflow_dispatch:
 
 permissions:
@@ -49,6 +49,16 @@ jobs:
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
+      - name: Mirror APK to dist branch (CDN jsDelivr)
+        if: steps.rel.outputs.exists == 'false' && env.MPHOTO_SIGNED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/dist && cp out/*.apk /tmp/dist/ && cd /tmp/dist
+          git init -q -b dist
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "dist v${VER}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" dist
       - name: Publish GitHub Release (new version only)
         if: steps.rel.outputs.exists == 'false' && env.MPHOTO_SIGNED == 'true'
         uses: softprops/action-gh-release@v2
