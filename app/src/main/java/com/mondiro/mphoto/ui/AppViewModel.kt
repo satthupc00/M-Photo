@@ -27,7 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Tab { Album, Folder, Settings }
+enum class Tab { Album, Folder, Files, Settings }
 
 /** 1 nút trong chế độ Thư mục. own = ảnh nằm trực tiếp trong thư mục này. */
 class Node(
@@ -87,6 +87,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val searchGridState = LazyGridState()
     private val folderListStates = HashMap<String, LazyListState>()
     fun folderListState(path: String): LazyListState = folderListStates.getOrPut(path) { LazyListState() }
+
+    /** Tab File (duyệt mọi file + Gần đây). */
+    val files = FilesModel(app, viewModelScope, this)
 
     var upd by mutableStateOf<UpdState>(UpdState.Idle)
     var updateDialog by mutableStateOf<Release?>(null)
@@ -187,6 +190,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         clearSelection()
         if (tab == t && t == Tab.Folder) path = emptyList()
         tab = t; openFolder = null; search = null
+        if (t == Tab.Files) files.refresh()
     }
 
     fun togglePin(p: String) {
@@ -325,6 +329,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Gọi khi app quay lại màn hình: nếu vừa cấp quyền cài app thì cài luôn. */
     fun onResume() {
+        files.checkPermission()
+        if (tab == Tab.Files) files.refresh()
         val f = pendingApk ?: return
         if (getApplication<Application>().packageManager.canRequestPackageInstalls() && f.exists()) installApk(f)
     }

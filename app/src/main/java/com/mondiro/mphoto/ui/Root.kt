@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ViewModule
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.GridView
@@ -114,6 +115,7 @@ fun MPhotoRoot(vm: AppViewModel) {
                 vm.search != null -> vm.search = null
                 vm.openFolder != null -> vm.openFolder = null
                 vm.tab == Tab.Folder && vm.path.isNotEmpty() -> { vm.path = vm.path.dropLast(1); vm.openFolder = null }
+                vm.tab == Tab.Files && vm.files.segment == "browse" && !vm.files.atRoot -> vm.files.up()
                 else -> (ctx.findActivity())?.moveTaskToBack(true)
             }
         }
@@ -122,6 +124,7 @@ fun MPhotoRoot(vm: AppViewModel) {
         vm.viewer?.let { Viewer(vm, it) }
         Dialogs(vm)
         FileOpsHost(vm)
+        FilesOverlays(vm, wide = expanded)
         ToastHost(vm, bottom = if (!expanded && vm.viewer == null) NAV_H + 16.dp else 24.dp)
     }
 }
@@ -160,13 +163,14 @@ private fun BottomNav(vm: AppViewModel) {
     Column(Modifier.fillMaxWidth().background(Mc.chrome.copy(alpha = 0.96f))) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Mc.line))
         BoxWithConstraints(Modifier.fillMaxWidth().height(NAV_H)) {
-            val w = maxWidth / 3
+            val w = maxWidth / 4
             val idx = vm.tab.ordinal
             val x by animateDpAsState(w * idx, tween(220), label = "ind")
             Box(Modifier.offset(x = x + w * 0.3f).width(w * 0.4f).height(2.dp).clip(RoundedCornerShape(2.dp)).background(Mc.red))
             Row(Modifier.fillMaxSize()) {
                 NavItem(Icons.Outlined.GridView, "Album", vm.tab == Tab.Album, Modifier.weight(1f)) { vm.selectTab(Tab.Album) }
                 NavItem(Icons.Outlined.Folder, "Thư mục", vm.tab == Tab.Folder, Modifier.weight(1f)) { vm.selectTab(Tab.Folder) }
+                NavItem(Icons.Outlined.Description, "File", vm.tab == Tab.Files, Modifier.weight(1f)) { vm.selectTab(Tab.Files) }
                 NavItem(Icons.Outlined.Settings, "Cài đặt", vm.tab == Tab.Settings, Modifier.weight(1f)) { vm.selectTab(Tab.Settings) }
             }
         }
@@ -194,7 +198,7 @@ private fun MainPane(vm: AppViewModel, fixedCols: Int?, bottomPad: androidx.comp
             vm.search != null -> SearchBar(vm)
             vm.tab == Tab.Folder && vm.path.isNotEmpty() -> TopBar(vm.path.last(), onBack = { vm.path = vm.path.dropLast(1); vm.openFolder = null }) { if (showActions) TopActions(vm) }
             else -> TopBar(
-                when (vm.tab) { Tab.Album -> "Album"; Tab.Folder -> "Thư mục"; Tab.Settings -> "Cài đặt" },
+                when (vm.tab) { Tab.Album -> "Album"; Tab.Folder -> "Thư mục"; Tab.Files -> "File"; Tab.Settings -> "Cài đặt" },
             ) {
                 if (vm.tab == Tab.Album) AlbumSizeButton(vm)
                 if (showActions) TopActions(vm)
@@ -203,6 +207,7 @@ private fun MainPane(vm: AppViewModel, fixedCols: Int?, bottomPad: androidx.comp
         if (vm.tab == Tab.Folder && vm.search == null) Crumbs(vm)
         Box(Modifier.weight(1f)) {
             when {
+                vm.tab == Tab.Files -> FilesScreen(vm, bottomPad)
                 vm.search != null -> AlbumGrid(vm, vm.searchResults, fixedCols, bottomPad, searching = vm.search!!.isNotBlank())
                 vm.tab == Tab.Album -> AlbumGrid(vm, vm.visible, fixedCols, bottomPad)
                 vm.tab == Tab.Folder -> FolderList(vm, bottomPad)
@@ -221,7 +226,7 @@ private fun SearchBar(vm: AppViewModel) {
         IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "Đóng tìm") { vm.search = null }
         TextField(
             value = vm.search ?: "", onValueChange = { vm.search = it }, singleLine = true,
-            placeholder = { Text("Tìm thư mục…", color = Mc.muted) },
+            placeholder = { Text(if (vm.tab == Tab.Files) "Tìm file…" else "Tìm thư mục…", color = Mc.muted) },
             leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Mc.muted) },
             trailingIcon = { if (!vm.search.isNullOrEmpty()) IconBtn(Icons.Outlined.Close, "Xoá") { vm.search = "" } },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -278,6 +283,7 @@ private fun Rail(vm: AppViewModel) {
     ) {
         RailItem(Icons.Outlined.GridView, "Album", vm.tab == Tab.Album) { vm.selectTab(Tab.Album) }
         RailItem(Icons.Outlined.Folder, "Thư mục", vm.tab == Tab.Folder) { vm.selectTab(Tab.Folder) }
+        RailItem(Icons.Outlined.Description, "File", vm.tab == Tab.Files) { vm.selectTab(Tab.Files) }
         RailItem(Icons.Outlined.Settings, "Cài đặt", vm.tab == Tab.Settings) { vm.selectTab(Tab.Settings) }
     }
 }

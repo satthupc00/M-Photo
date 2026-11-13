@@ -1,11 +1,11 @@
-## M Photo v1.4.2 · 11/11/2026
+## M Photo v1.5.0 · 13/11/2026
 
 ### Mới
-- Video tự phát khi mở hoặc khi vuốt tới
-- Tải bản cập nhật hiện tốc độ, thời gian còn lại và máy chủ đang tải
+- Tab **File**: duyệt mọi thư mục và mọi loại file (PDF, ZIP, APK, PSD, Spine…)
+- Mục **Gần đây**: file mới trong 30 ngày, chia Hôm nay / Hôm qua / 7 ngày / 30 ngày, lọc theo Tải về, Ảnh, Video, Tài liệu, Thiết kế, APK, File nén, Âm thanh
+- Mở, chia sẻ, copy, di chuyển, đổi tên, xoá file; tạo thư mục mới khi chọn nơi đến
+- Sắp xếp theo tên / ngày / dung lượng, bật/tắt hiện file ẩn, xem dung lượng bộ nhớ
 
-### Cải thiện
-- Tải bản cập nhật nhanh hơn: thêm máy chủ CDN dự phòng, tự chuyển sang GitHub nếu CDN lỗi
-- Mạng bị đứng chỉ chờ 5 giây là tải tiếp (trước là 12 giây)
+**Lần đầu mở tab File:** bấm "Mở cài đặt" và bật "Cho phép quản lý tất cả file" cho M Photo.
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).
