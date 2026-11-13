@@ -195,7 +195,7 @@ private fun DestinationPicker(vm: AppViewModel, req: PickerReq) {
             Column {
                 if (newPath == null) {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable { newPath = "Pictures/" }.padding(vertical = 10.dp, horizontal = 6.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable { newPath = req.defaultNew ?: "Pictures/" }.padding(vertical = 10.dp, horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Outlined.CreateNewFolder, null, tint = Mc.red)

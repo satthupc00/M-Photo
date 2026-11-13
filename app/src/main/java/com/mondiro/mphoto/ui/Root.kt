@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ViewModule
 import androidx.compose.material.icons.outlined.Folder
@@ -200,7 +201,7 @@ private fun MainPane(vm: AppViewModel, fixedCols: Int?, bottomPad: androidx.comp
             else -> TopBar(
                 when (vm.tab) { Tab.Album -> "Album"; Tab.Folder -> "Thư mục"; Tab.Files -> "File"; Tab.Settings -> "Cài đặt" },
             ) {
-                if (vm.tab == Tab.Album) AlbumSizeButton(vm)
+                if (vm.tab == Tab.Album) { TripButton(vm); AlbumSizeButton(vm) }
                 if (showActions) TopActions(vm)
             }
         }
@@ -338,5 +339,14 @@ private fun AlbumSizeButton(vm: AppViewModel) {
         val next = if (vm.albumSize == 0) 2 else vm.albumSize - 1
         vm.changeAlbumSize(next)
         vm.toast("Cỡ ô: " + when (next) { 0 -> "Nhỏ"; 1 -> "Vừa"; else -> "To" })
+    }
+}
+
+/** Nút chuyến đi trên thanh Album: chưa có chuyến đi -> bắt đầu; đang đi -> mở album chuyến đi. */
+@Composable
+private fun TripButton(vm: AppViewModel) {
+    val t = vm.activeTrip
+    IconBtn(Icons.Outlined.FlightTakeoff, if (t == null) "Bắt đầu chuyến đi" else "Chuyến đi: ${t.name}", tint = if (t != null) Mc.red else Color(0xFFCFD2D8)) {
+        if (t == null) vm.dialog = "trip" else vm.openFolder = t.key
     }
 }

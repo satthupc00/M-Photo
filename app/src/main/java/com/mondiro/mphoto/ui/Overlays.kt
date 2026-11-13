@@ -37,7 +37,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.FlightLand
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
@@ -165,14 +169,30 @@ fun FolderSheet(vm: AppViewModel, path: String, wide: Boolean) {
                 Action(if (pinned) Icons.Filled.Star else Icons.Outlined.StarBorder, if (pinned) "Bỏ ghim" else "Ghim lên đầu", "Đánh dấu sao, luôn nằm trên cùng", tint = if (pinned) Mc.star else Mc.text) {
                     vm.sheetFolder = null; vm.togglePin(path)
                 }
+                val trip = vm.tripOf(path)
+                if (trip != null) {
+                    if (trip.active) Action(Icons.Outlined.FlightLand, "Kết thúc chuyến đi", "Ảnh chụp sau lúc này sẽ không vào album nữa", tint = Mc.red) {
+                        vm.sheetFolder = null; vm.endTrip()
+                    }
+                    Action(Icons.Outlined.ContentCopy, "Copy tất cả vào thư mục…", "Giữ bản gốc ở Camera, tạo bản sao trong thư mục riêng") {
+                        vm.sheetFolder = null; vm.exportTrip(path, move = false)
+                    }
+                    Action(Icons.AutoMirrored.Outlined.DriveFileMove, "Chuyển tất cả vào thư mục…", "Nhớ bật sao lưu Google Photos cho thư mục mới") {
+                        vm.sheetFolder = null; vm.exportTrip(path, move = true)
+                    }
+                    Action(Icons.Outlined.DeleteOutline, "Xoá album chuyến đi", "Chỉ xoá album, ảnh vẫn giữ nguyên", tint = Mc.redSoft) {
+                        vm.sheetFolder = null; vm.deleteTrip(path)
+                    }
+                } else {
                 Action(if (hidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff, if (hidden) "Bỏ ẩn" else "Ẩn thư mục", "Chỉ hiện khi mở khoá bằng vân tay") {
-                    vm.sheetFolder = null; vm.toggleHide(path)
-                }
-                Action(Icons.Outlined.CloudUpload, "Sync lên Google Photos", if (path in vm.gsync) "Đang đánh dấu sync · chạm để xem" else "Mở cài đặt sao lưu thư mục", tint = if (path in vm.gsync) Mc.green else Mc.text) {
-                    vm.sheetFolder = null; vm.dialog = "gp:$path"
-                }
-                Action(Icons.Outlined.Block, "Loại trừ khỏi thư viện", "Không hiện thư mục này nữa", tint = Mc.redSoft) {
-                    vm.sheetFolder = null; vm.excludeFolder(path)
+                        vm.sheetFolder = null; vm.toggleHide(path)
+                    }
+                    Action(Icons.Outlined.CloudUpload, "Sync lên Google Photos", if (path in vm.gsync) "Đang đánh dấu sync · chạm để xem" else "Mở cài đặt sao lưu thư mục", tint = if (path in vm.gsync) Mc.green else Mc.text) {
+                        vm.sheetFolder = null; vm.dialog = "gp:$path"
+                    }
+                    Action(Icons.Outlined.Block, "Loại trừ khỏi thư viện", "Không hiện thư mục này nữa", tint = Mc.redSoft) {
+                        vm.sheetFolder = null; vm.excludeFolder(path)
+                    }
                 }
             }
         }
@@ -227,6 +247,29 @@ fun Dialogs(vm: AppViewModel) {
                         TextButton({ vm.addRule(text, include = false); close() }, enabled = text.isNotBlank()) { Text("Loại trừ", color = Mc.red, fontWeight = FontWeight.Bold) }
                     }
                 },
+                dismissButton = { TextButton(close) { Text("Huỷ", color = Mc.muted) } },
+            )
+        }
+
+        d == "trip" -> {
+            val def = "Chuyến đi " + java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+            var name by remember { mutableStateOf(def) }
+            AlertDialog(
+                onDismissRequest = close,
+                containerColor = Mc.panel,
+                title = { Text("Bắt đầu chuyến đi", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text("Từ bây giờ, mọi ảnh/video chụp bằng máy sẽ tự hiện trong album chuyến đi (ghim trên cùng). File vẫn nằm nguyên ở Camera nên Google Photos vẫn sao lưu bình thường.", color = Mc.muted, fontSize = 13.sp)
+                        Spacer(Modifier.size(12.dp))
+                        OutlinedTextField(
+                            value = name, onValueChange = { name = it }, singleLine = true, label = { Text("Tên chuyến đi") },
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Mc.red, unfocusedBorderColor = Mc.line, cursorColor = Mc.red, focusedLabelColor = Mc.red),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                confirmButton = { TextButton({ vm.startTrip(name); close() }, enabled = name.isNotBlank()) { Text("Bắt đầu", color = Mc.red, fontWeight = FontWeight.Bold) } },
                 dismissButton = { TextButton(close) { Text("Huỷ", color = Mc.muted) } },
             )
         }

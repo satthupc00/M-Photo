@@ -41,7 +41,7 @@ class Node(
 )
 
 data class ViewerState(val folder: String, val index: Int)
-data class PickerReq(val items: List<MediaItem>, val move: Boolean)
+data class PickerReq(val items: List<MediaItem>, val move: Boolean, val defaultNew: String? = null)
 class PermReq(val sender: android.content.IntentSender, val onGranted: () -> Unit)
 data class ToastMsg(val text: String, val id: Long = System.nanoTime())
 
@@ -181,7 +181,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (debounce) delay(800)
             loading = !loadedOnce
             try {
-                folders = MediaRepository.load(getApplication())
+                raw = MediaRepository.load(getApplication())
+                rebuildFolders()
             } catch (_: Exception) {
             }
             loading = false
@@ -189,6 +190,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             openFolder?.let { if (it !in folders) openFolder = null }
             viewer?.let { v -> val f = folders[v.folder]; if (f == null || f.count == 0) viewer = null else if (v.index >= f.count) viewer = v.copy(index = f.count - 1) }
         }
+    }
+
+    // ---------------- chuyến đi ----------------
+    private var raw: Map<String, Folder> = emptyMap()
+    var trips by mutableStateOf(prefs.trips)
+        private set
+    val activeTrip: com.mondiro.mphoto.data.Trip? get() = trips.firstOrNull { it.active }
+
+    /** Ghép album chuyến đi (ảnh/video chụp bằng máy trong khoảng thời gian chuyến đi) vào danh sách thư mục. */
+    private fun rebuildFolders() {
+        val all = raw.toMutableMap()
+        if (trips.isNotEmpty()) {
+            val cam = raw.values.filter { it.path.startsWith("DCIM", true) && !it.path.contains("screen", true) }.flatMap { it.items }
+            for (t in trips) {
+                // Ảnh chụp trong thời gian chuyến đi + ảnh đã chuyển sang thư mục riêng của chuyến đi
+                val exported = raw["Pictures/${t.name}"]?.items.orEmpty()
+                val items = (cam.filter { it.date >= t.start && (t.end == 0L || it.date <= t.end) } + exported)
+                    .distinctBy { it.id }.sortedByDescending { it.date }
+                all[t.key] = Folder(t.key, items)
+            }
+        }
+        folders = all
+    }
+
+    private fun saveTrips(v: List<com.mondiro.mphoto.data.Trip>) { trips = v; prefs.trips = v; rebuildFolders() }
+
+    fun startTrip(rawName: String) {
+        var name = rawName.trim().replace('/', '-').ifEmpty { "Chuyến đi" }
+        var i = 2
+        val base = name
+        while (trips.any { it.name == name }) name = "$base ($i)".also { i++ }
+        val ended = trips.map { if (it.active) it.copy(end = System.currentTimeMillis()) else it }
+        val t = com.mondiro.mphoto.data.Trip(name, System.currentTimeMillis())
+        saveTrips(ended + t)
+        pinned = pinned + t.key; prefs.pinned = pinned
+        toast("Bắt đầu chuyến đi \"$name\" · ảnh chụp từ giờ sẽ vào album này")
+    }
+
+    fun endTrip() {
+        val a = activeTrip ?: return
+        saveTrips(trips.map { if (it.active) it.copy(end = System.currentTimeMillis()) else it })
+        toast("Đã kết thúc chuyến đi \"${a.name}\" · ${folders[a.key]?.count ?: 0} ảnh/video")
+    }
+
+    fun tripOf(path: String) = trips.firstOrNull { it.key == path }
+
+    fun deleteTrip(path: String) {
+        val t = tripOf(path) ?: return
+        saveTrips(trips - t)
+        pinned = pinned - t.key; prefs.pinned = pinned
+        if (openFolder == t.key) openFolder = null
+        toast("Đã xoá album chuyến đi (ảnh vẫn giữ nguyên)")
+    }
+
+    fun exportTrip(path: String, move: Boolean) {
+        val t = tripOf(path) ?: return
+        val items = folders[t.key]?.items.orEmpty()
+        if (items.isEmpty()) { toast("Chuyến đi chưa có ảnh nào"); return }
+        picker = PickerReq(items, move, defaultNew = "Pictures/${t.name}")
     }
 
     override fun onCleared() {

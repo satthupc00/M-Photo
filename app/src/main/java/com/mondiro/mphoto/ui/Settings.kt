@@ -29,7 +29,9 @@ import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.PanTool
@@ -92,6 +94,17 @@ fun SettingsScreen(vm: AppViewModel, bottomPad: Dp) {
                             Chip("To", vm.albumSize == 2, Mc.red) { vm.changeAlbumSize(2) }
                         }
                     })
+                }
+
+                GroupTitle("Chuyến đi")
+                Group {
+                    val t = vm.activeTrip
+                    Item(
+                        Icons.Outlined.FlightTakeoff, "Chế độ chuyến đi",
+                        if (t == null) "Bật để gom ảnh chụp từ giờ vào 1 album" else "Đang đi: ${t.name} · ${vm.folders[t.key]?.count ?: 0} ảnh/video",
+                        trailing = { Switch(t != null) },
+                    ) { if (t == null) vm.dialog = "trip" else vm.endTrip() }
+                    if (t != null) Item(Icons.Outlined.PhotoAlbum, "Mở album chuyến đi", null, chevron = true) { vm.selectTab(Tab.Album); vm.openFolder = t.key }
                 }
 
                 GroupTitle("Tốc độ")

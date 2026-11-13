@@ -4,6 +4,12 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Chuyến đi: album gom ảnh chụp từ [start] tới [end] (end = 0 là đang diễn ra). */
+data class Trip(val name: String, val start: Long, val end: Long = 0) {
+    val key: String get() = "Chuyến đi/$name"
+    val active: Boolean get() = end == 0L
+}
+
 /** Rule người dùng thêm: include = true nghĩa là "Không loại trừ" (ưu tiên hơn mọi rule loại trừ). */
 data class UserRule(val pattern: String, val include: Boolean)
 
@@ -100,6 +106,17 @@ class Prefs(context: Context) {
     var albumSize: Int
         get() = sp.getInt("albumSize", 2)
         set(v) = sp.edit().putInt("albumSize", v).apply()
+
+    var trips: List<Trip>
+        get() = try {
+            val a = JSONArray(sp.getString("trips", "[]"))
+            (0 until a.length()).map { a.getJSONObject(it).let { o -> Trip(o.getString("n"), o.getLong("s"), o.optLong("e", 0)) } }
+        } catch (e: Exception) { emptyList() }
+        set(v) {
+            val a = JSONArray()
+            v.forEach { a.put(JSONObject().put("n", it.name).put("s", it.start).put("e", it.end)) }
+            sp.edit().putString("trips", a.toString()).apply()
+        }
 
     var rules: List<UserRule>
         get() = try {
