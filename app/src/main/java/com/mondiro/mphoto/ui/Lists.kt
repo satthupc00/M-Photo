@@ -75,11 +75,11 @@ fun AlbumGrid(vm: AppViewModel, folders: List<Folder>, fixedCols: Int?, bottomPa
         state = gridState,
         flingBehavior = rememberFastFling(vm.scrollSpeed),
         columns = if (fixedCols != null) GridCells.Fixed(when (size) { 0 -> fixedCols + 2; 1 -> fixedCols + 1; else -> fixedCols })
-        else GridCells.Adaptive(when (size) { 0 -> 88.dp; 1 -> 112.dp; else -> 150.dp }),
+        else GridCells.Adaptive(cellSize(size)),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = bottomPad),
         horizontalArrangement = Arrangement.spacedBy(if (size == 0) 8.dp else 12.dp),
         verticalArrangement = Arrangement.spacedBy(if (size == 0) 6.dp else 10.dp),
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().pinchResize(vm),
     ) {
         if (pins.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }, key = "h-pin") { SectionTitle("Đã ghim", icon = { StarIcon(14.dp) }) }
@@ -264,15 +264,24 @@ fun FolderDetail(vm: AppViewModel, f: Folder, compact: Boolean, bottomPad: Dp, s
             color = Mc.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
         )
+        val gridState = vm.folderGridState(f.path)
+        // Thoát trình xem: nếu ảnh vừa xem không nằm trên màn hình thì cuộn tới đó
+        LaunchedEffect(vm.viewer == null) {
+            val lv = vm.lastViewed
+            if (vm.viewer == null && lv != null && lv.folder == f.path && lv.index < f.count) {
+                if (gridState.layoutInfo.visibleItemsInfo.none { it.index == lv.index }) gridState.scrollToItem(lv.index)
+            }
+        }
         LazyVerticalGrid(
+            state = gridState,
             flingBehavior = rememberFastFling(vm.scrollSpeed),
-            columns = GridCells.Adaptive(if (compact) 88.dp else 112.dp),
+            columns = GridCells.Adaptive(cellSize(vm.albumSize)),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
             contentPadding = PaddingValues(bottom = bottomPad),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().pinchResize(vm),
         ) {
-            items(f.items.size, key = { f.items[it].id }) { i -> GridThumb(vm, f.path, f.items[i], i) }
+            items(f.items.size, key = { f.items[it].id }) { i -> Box(Modifier.animateItem()) { GridThumb(vm, f.path, f.items[i], i) } }
         }
     }
 }

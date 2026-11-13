@@ -136,7 +136,10 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
         if (bars && !videoFull) ctl?.show(WindowInsetsCompat.Type.systemBars()) else ctl?.hide(WindowInsetsCompat.Type.systemBars())
         onDispose { ctl?.show(WindowInsetsCompat.Type.systemBars()) }
     }
-    LaunchedEffect(pager.currentPage) { vm.viewer = state.copy(index = pager.currentPage); videoFull = false }
+    LaunchedEffect(pager.currentPage) {
+        val s = state.copy(index = pager.currentPage)
+        vm.viewer = s; vm.lastViewed = s; videoFull = false
+    }
     BackHandler { vm.viewer = null }
     BackHandler(enabled = videoFull) { videoFull = false }
 

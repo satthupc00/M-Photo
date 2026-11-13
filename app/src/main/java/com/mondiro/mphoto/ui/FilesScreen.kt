@@ -47,6 +47,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -239,6 +240,8 @@ fun FileIcon(e: FileEntry, modifier: Modifier) {
 
 private fun onFileClick(ctx: Context, vm: AppViewModel, e: FileEntry) {
     if (e.isDir) { vm.files.open(e.file); return }
+    // File nén: mở menu để chọn Giải nén
+    if (e.kind == FileKind.Archive) { vm.files.sheet = e; return }
     if (e.kind == FileKind.Image || e.kind == FileKind.Video) {
         // Ảnh / video: mở bằng trình xem của M Photo nếu thư viện có file này
         val rel = Files.rel(e.path)
@@ -343,6 +346,10 @@ fun FilesOverlays(vm: AppViewModel, wide: Boolean) {
                         if (fm.segment == "recent") SheetAction(Icons.Outlined.Folder, "Mở thư mục chứa file") {
                             close(); fm.segment = "browse"; fm.open(e.file.parentFile ?: Files.root)
                         }
+                    }
+                    if (e.kind == FileKind.Archive) SheetAction(Icons.Outlined.Unarchive, "Giải nén") {
+                        close()
+                        if (e.ext == "zip") fm.unzip(e) else vm.toast("Hiện chỉ giải nén được file ZIP, chưa hỗ trợ ${e.ext.uppercase()}")
                     }
                     SheetAction(Icons.Outlined.ContentCopy, "Copy tới…") { close(); fm.dialogTarget = e; fm.dialog = "copy" }
                     SheetAction(Icons.AutoMirrored.Outlined.DriveFileMove, "Di chuyển tới…") { close(); fm.dialogTarget = e; fm.dialog = "move" }

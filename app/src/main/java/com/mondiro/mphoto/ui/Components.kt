@@ -47,6 +47,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -264,4 +268,34 @@ fun downloadLabel(d: com.mondiro.mphoto.update.UpdState.Downloading): String = b
     if (d.speed > 0) append(" · " + if (d.speed >= 1_048_576) "%.1f MB/s".format(d.speed / 1048576.0) else "${d.speed / 1024} KB/s")
     if (d.eta >= 0) append(" · còn " + if (d.eta >= 60) "${d.eta / 60} phút ${d.eta % 60} giây" else "${d.eta} giây")
     if (d.source.isNotEmpty()) append(" · từ ${d.source}")
+}
+
+/** Cỡ ô theo bậc (dùng chung cho Album và lưới ảnh): 0 nhỏ, 1 vừa, 2 to. */
+fun cellSize(level: Int): androidx.compose.ui.unit.Dp = when (level) { 0 -> 88.dp; 1 -> 112.dp; else -> 150.dp }
+
+/**
+ * Chụm / mở 2 ngón trên lưới để đổi cỡ ô nhanh qua 3 bậc (mỗi lần chụm đổi 1 bậc).
+ * Bắt sự kiện ở lượt đầu (Initial) để 2 ngón không bị lưới hiểu thành cuộn.
+ */
+@Composable
+fun Modifier.pinchResize(vm: AppViewModel): Modifier {
+    val haptic = LocalHapticFeedback.current
+    return this.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            var acc = 1f
+            do {
+                val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                if (ev.changes.count { it.pressed } >= 2) {
+                    acc *= ev.calculateZoom()
+                    // Chụm tiếp thì đổi tiếp bậc kế (to -> vừa -> nhỏ và ngược lại)
+                    if (acc > 1.2f || acc < 0.83f) {
+                        if (vm.stepSize(if (acc > 1f) 1 else -1)) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        acc = 1f
+                    }
+                    ev.changes.forEach { it.consume() }
+                }
+            } while (ev.changes.any { it.pressed })
+        }
+    }
 }

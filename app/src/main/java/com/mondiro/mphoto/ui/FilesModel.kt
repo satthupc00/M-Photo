@@ -137,6 +137,23 @@ class FilesModel(private val app: Application, private val scope: CoroutineScope
         vm.busy = null
     }
 
+    fun unzip(e: FileEntry) = scope.launch {
+        vm.busy = "Đang giải nén…"
+        try {
+            val dest = com.mondiro.mphoto.data.Zip.unzip(e.file) { done, total ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { vm.busy = "Đang giải nén $done/$total…" }
+            }
+            vm.toast("Đã giải nén vào thư mục ${dest.name}")
+            Files.scan(app, listOf(dest.absolutePath))
+            segment = "browse"
+            open(dest)
+            vm.reload(debounce = true)
+        } catch (ex: Exception) {
+            vm.toast("Không giải nén được: ${ex.message}")
+        }
+        vm.busy = null
+    }
+
     fun newFolder(parent: File, name: String): File? {
         val n = name.trim()
         if (n.isEmpty() || n.contains('/')) return null

@@ -85,7 +85,7 @@ fun SettingsScreen(vm: AppViewModel, bottomPad: Dp) {
                             Chip("Thư mục", vm.defaultTab == "folder", Mc.red) { vm.setDefault("folder") }
                         }
                     })
-                    Item(Icons.Outlined.GridView, "Cỡ ô Album", null, trailing = {
+                    Item(Icons.Outlined.GridView, "Cỡ ô ảnh", "Chụm 2 ngón trên lưới để đổi nhanh", trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Chip("Nhỏ", vm.albumSize == 0, Mc.red) { vm.changeAlbumSize(0) }
                             Chip("Vừa", vm.albumSize == 1, Mc.red) { vm.changeAlbumSize(1) }

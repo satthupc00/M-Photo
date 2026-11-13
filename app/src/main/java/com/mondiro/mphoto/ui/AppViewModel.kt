@@ -84,6 +84,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // Giữ vị trí cuộn khi mở thư mục rồi quay ra, hoặc đổi tab
     val albumGridState = LazyGridState()
+    private val folderGridStates = HashMap<String, LazyGridState>()
+    /** Lưới ảnh của từng thư mục giữ vị trí cuộn riêng (mở lại thư mục là về đúng chỗ cũ). */
+    fun folderGridState(path: String): LazyGridState = folderGridStates.getOrPut(path) { LazyGridState() }
+    /** Ảnh xem gần nhất trong trình xem, để khi thoát ra lưới cuộn tới đúng ảnh đó. */
+    var lastViewed by mutableStateOf<ViewerState?>(null)
+
+    /** Đổi cỡ ô (dùng chung cho Album và lưới ảnh) theo 1 bậc: +1 to hơn, -1 nhỏ hơn. */
+    fun stepSize(d: Int): Boolean {
+        val n = (albumSize + d).coerceIn(0, 2)
+        if (n == albumSize) return false
+        changeAlbumSize(n); return true
+    }
     val searchGridState = LazyGridState()
     private val folderListStates = HashMap<String, LazyListState>()
     fun folderListState(path: String): LazyListState = folderListStates.getOrPut(path) { LazyListState() }
