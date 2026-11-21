@@ -1,11 +1,9 @@
-## M Photo v1.8.0 · 21/11/2026
+## M Photo v1.8.1 · 21/11/2026
 
 ### Mới
-- **Sửa ảnh**: Cắt (tự do hoặc theo tỉ lệ 1:1, 4:3, 16:9…), Xoay, Lật ngang / dọc, chỉnh Nghiêng
-- Vẽ lên ảnh: Bút, Bút dạ, Tẩy nét vẽ; 9 màu có sẵn + chọn màu bất kỳ; chỉnh cỡ nét
-- Hoàn tác / Làm lại từng bước
-- Lưu đè ảnh gốc hoặc lưu thành ảnh mới (tự thêm số sau tên cũ)
+- Sửa ảnh: chụm 2 ngón để phóng to ảnh khi cắt / vẽ (1 ngón vẫn kéo khung cắt, vẽ như thường), nút "Thu về" để trở lại vừa khung
 
-**Cách dùng:** mở 1 ảnh › bấm nút cây bút (Sửa ảnh).
+### Cải thiện
+- Bảng màu khi vẽ gọn hơn: chỉ còn Đỏ, Đen và ô chọn màu tự do
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).

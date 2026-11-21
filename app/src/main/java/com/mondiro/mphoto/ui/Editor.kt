@@ -75,7 +75,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke as DrawStroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -94,10 +99,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-private val PALETTE = listOf(
-    Color(0xFFFFFFFF), Color(0xFF111111), Color(0xFFE5383B), Color(0xFFF5A623), Color(0xFFFFE14D),
-    Color(0xFF3DDC8A), Color(0xFF3D9BFF), Color(0xFF9B5CFF), Color(0xFFFF6FB5),
-)
+/** Màu có sẵn khi vẽ: đỏ, đen (+ 1 ô chọn màu tự do). */
+private val PALETTE = listOf(Color(0xFFE5383B), Color(0xFF111111))
 private val RATIOS = listOf("Tự do" to 0f, "Gốc" to -1f, "1:1" to 1f, "4:3" to 4f / 3f, "3:4" to 3f / 4f, "16:9" to 16f / 9f, "9:16" to 9f / 16f)
 
 /** Khung cắt chuẩn hoá 0..1. */
@@ -175,7 +178,31 @@ fun PhotoEditor(vm: AppViewModel, item: MediaItem) {
         }
 
         // ----- vùng ảnh
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+        // Chụm 2 ngón để phóng to / thu nhỏ vùng ảnh (1 ngón vẫn dùng để kéo khung cắt / vẽ)
+        val ez = rememberZoomState(item.id)
+        Box(
+            Modifier.weight(1f).fillMaxWidth().clipToBounds()
+                .onSizeChanged { ez.size = it }
+                .pointerInput(ez) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        var multi = false
+                        do {
+                            val ev = awaitPointerEvent(PointerEventPass.Initial)
+                            if (ev.changes.count { it.pressed } >= 2) {
+                                multi = true
+                                ez.touching = true
+                                ez.zoomBy(ev.calculateZoom(), ev.calculateCentroid(useCurrent = true), ev.calculatePan(), min = 1f, max = 8f)
+                                ev.changes.forEach { it.consume() }
+                            }
+                        } while (ev.changes.any { it.pressed })
+                        ez.touching = false
+                        if (multi) ez.settle()
+                    }
+                },
+        ) {
+        Box(Modifier.fillMaxSize().zoomLayer(ez)) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
             val b = base
             if (b != null) {
                 val density = LocalDensity.current
@@ -234,6 +261,14 @@ fun PhotoEditor(vm: AppViewModel, item: MediaItem) {
                     if (tab == "crop") CropOverlay(crop, ratioPx(ratio, baseW, baseH), baseW, baseH) { crop = it }
                 }
             } else Text("Đang mở ảnh…", color = Mc.muted)
+        }
+        }
+        ZoomBadge(ez, modifier = Modifier.align(Alignment.Center))
+        if (ez.zoomed) Text(
+            "Thu về", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).clip(RoundedCornerShape(12.dp)).background(Color(0x99000000))
+                .pressable { ez.animateTo(1f) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
         }
 
         // ----- bảng công cụ
