@@ -254,6 +254,94 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         picker = PickerReq(items, move, defaultNew = "Pictures/${t.name}")
     }
 
+    // ---------------- sửa ảnh ----------------
+    /** Ảnh đang mở trong màn hình Sửa ảnh. */
+    var editing by mutableStateOf<MediaItem?>(null)
+
+    /**
+     * Lưu ảnh đã sửa. overwrite = true: ghi đè file gốc; false: lưu thành file mới cùng thư mục,
+     * tên cũ thêm số phía sau (vd IMG_01.jpg -> IMG_01 (1).jpg).
+     */
+    fun saveEdit(item: MediaItem, ops: List<com.mondiro.mphoto.data.EditOp>, overwrite: Boolean) {
+        viewModelScope.launch {
+            busy = "Đang lưu ảnh…"
+            val ctx = getApplication<Application>()
+            try {
+                val savedName = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val src = com.mondiro.mphoto.data.EditRender.decode(ctx, item.uri, 4096)
+                    val out = com.mondiro.mphoto.data.EditRender.applyAll(src, ops)
+                    try { writeEdited(item, out, overwrite) } finally { if (out !== src) out.recycle(); src.recycle() }
+                }
+                editing = null
+                toast(if (overwrite && savedName == item.name) "Đã lưu đè ảnh gốc" else "Đã lưu thành $savedName")
+                reload()
+            } catch (e: SecurityException) {
+                // Chưa có quyền sửa file gốc: xin quyền của Android rồi lưu lại
+                try {
+                    val pi = MediaStore.createWriteRequest(ctx.contentResolver, listOf(item.uri))
+                    permissionRequest = PermReq(pi.intentSender) { saveEdit(item, ops, overwrite) }
+                } catch (_: Exception) { toast("Không có quyền sửa ảnh này") }
+            } catch (e: Exception) {
+                toast("Không lưu được ảnh: ${e.message}")
+            }
+            busy = null
+        }
+    }
+
+    private fun writeEdited(item: MediaItem, bmp: android.graphics.Bitmap, overwriteWanted: Boolean): String {
+        val ctx = getApplication<Application>()
+        val r = ctx.contentResolver
+        val mime = item.mime.lowercase()
+        // Định dạng giữ nguyên; định dạng không ghi được (HEIC…) thì lưu thành JPG mới
+        val (fmt, ext, outMime) = when (mime) {
+            "image/png" -> Triple(android.graphics.Bitmap.CompressFormat.PNG, "png", "image/png")
+            "image/webp" -> Triple(android.graphics.Bitmap.CompressFormat.WEBP_LOSSY, "webp", "image/webp")
+            "image/jpeg", "image/jpg" -> Triple(android.graphics.Bitmap.CompressFormat.JPEG, item.name.substringAfterLast('.', "jpg"), "image/jpeg")
+            else -> Triple(android.graphics.Bitmap.CompressFormat.JPEG, "jpg", "image/jpeg")
+        }
+        val sameFormat = mime == outMime || (mime == "image/jpg" && outMime == "image/jpeg")
+        val overwrite = overwriteWanted && sameFormat
+        val path = try {
+            r.query(item.uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        } catch (_: Exception) { null }
+        val base = item.name.substringBeforeLast('.')
+        val canFile = path != null && com.mondiro.mphoto.data.Files.hasAllFilesAccess() && java.io.File(path).exists()
+
+        if (overwrite) {
+            if (canFile) {
+                java.io.File(path!!).outputStream().use { bmp.compress(fmt, 95, it) }
+                com.mondiro.mphoto.data.Files.scan(ctx, listOf(path))
+            } else {
+                r.openOutputStream(item.uri, "wt")!!.use { bmp.compress(fmt, 95, it) }
+            }
+            return item.name
+        }
+        // Lưu thành file mới
+        if (canFile) {
+            val src = java.io.File(path!!)
+            val target = com.mondiro.mphoto.data.Files.uniqueTarget(src.parentFile!!, "$base.$ext")
+            target.outputStream().use { bmp.compress(fmt, 95, it) }
+            com.mondiro.mphoto.data.Files.scan(ctx, listOf(target.absolutePath))
+            return target.name
+        }
+        val names = folders[item.folder]?.items?.map { it.name }?.toSet().orEmpty()
+        var n = 1
+        var name = "$base ($n).$ext"
+        while (name in names) { n++; name = "$base ($n).$ext" }
+        val rel = if (com.mondiro.mphoto.data.FileOps.canPlace(item.folder, false)) com.mondiro.mphoto.data.FileOps.normalize(item.folder) else "Pictures"
+        val values = android.content.ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, outMime)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "$rel/")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val coll = if (rel.startsWith("Download")) MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val uri = r.insert(coll, values) ?: throw IllegalStateException("không tạo được file mới")
+        r.openOutputStream(uri)!!.use { bmp.compress(fmt, 95, it) }
+        r.update(uri, android.content.ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+        return name
+    }
+
     // ---------------- mở từ app khác ----------------
     /** Ảnh/video mở từ app khác mà thư viện không có (vd file của app khác chia sẻ). */
     private var externalFolder: Folder? = null

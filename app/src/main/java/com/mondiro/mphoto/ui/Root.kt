@@ -131,6 +131,7 @@ fun MPhotoRoot(vm: AppViewModel) {
 
         vm.sheetFolder?.let { FolderSheet(vm, it, wide = expanded) }
         vm.viewer?.let { Viewer(vm, it) }
+        vm.editing?.let { PhotoEditor(vm, it) }
         Dialogs(vm)
         FileOpsHost(vm)
         FilesOverlays(vm, wide = expanded)

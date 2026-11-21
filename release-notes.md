@@ -1,9 +1,11 @@
-## M Photo v1.7.1 · 21/11/2026
+## M Photo v1.8.0 · 21/11/2026
 
 ### Mới
-- M Photo có mặt trong bảng "Mở bằng…" của Android: mở ảnh / video từ app khác (vd sau khi chụp màn hình) bằng trình xem của M Photo
+- **Sửa ảnh**: Cắt (tự do hoặc theo tỉ lệ 1:1, 4:3, 16:9…), Xoay, Lật ngang / dọc, chỉnh Nghiêng
+- Vẽ lên ảnh: Bút, Bút dạ, Tẩy nét vẽ; 9 màu có sẵn + chọn màu bất kỳ; chỉnh cỡ nét
+- Hoàn tác / Làm lại từng bước
+- Lưu đè ảnh gốc hoặc lưu thành ảnh mới (tự thêm số sau tên cũ)
 
-### Cải thiện
-- Mở từ app khác: vuốt xem được các ảnh cùng thư mục, bấm back là quay lại app trước đó
+**Cách dùng:** mở 1 ảnh › bấm nút cây bút (Sửa ảnh).
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).

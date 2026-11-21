@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.OpenInNew
@@ -215,6 +216,7 @@ fun Viewer(vm: AppViewModel, state: ViewerState) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 if (cur != null && !cur.isVideo) {
+                    IconBtn(Icons.Outlined.Edit, "Sửa ảnh", tint = Color.White) { vm.editing = cur }
                     IconBtn(Icons.Outlined.RotateRight, "Xoay", tint = Color.White) {
                         val e = editOf(cur)
                         // Khi đang lật, xoay theo chiều ngược lại để trên màn hình vẫn là xoay phải
