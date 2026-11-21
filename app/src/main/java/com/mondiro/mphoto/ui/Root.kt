@@ -93,6 +93,14 @@ fun MPhotoRoot(vm: AppViewModel) {
         onPauseOrDispose { }
     }
 
+    // Mở ảnh từ app khác: đóng trình xem thì quay lại app đó
+    LaunchedEffect(vm.viewer == null) {
+        if (vm.viewer == null && vm.externalViewing) {
+            vm.externalViewing = false
+            ctx.findActivity()?.finish()
+        }
+    }
+
     // Hộp thoại cài bản cập nhật: mở từ màn hình app (Activity) để Android không chặn
     LaunchedEffect(Unit) {
         com.mondiro.mphoto.update.InstallEvents.confirm.collect { i ->

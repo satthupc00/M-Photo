@@ -1,16 +1,9 @@
-## M Photo v1.7.0 · 13/11/2026
+## M Photo v1.7.1 · 21/11/2026
 
 ### Mới
-- **Chế độ chuyến đi**: bật công tắc, mọi ảnh/video chụp từ lúc đó tự vào 1 album ghim trên cùng (file vẫn ở Camera, Google Photos vẫn sao lưu)
-- Kết thúc chuyến đi: copy hoặc chuyển cả chuyến đi vào thư mục riêng chỉ với 1 nút
-- Giải nén file ZIP ngay trong tab File
-- Chụm / mở 2 ngón trên lưới để đổi nhanh cỡ ô qua 3 bậc Nhỏ - Vừa - To
+- M Photo có mặt trong bảng "Mở bằng…" của Android: mở ảnh / video từ app khác (vd sau khi chụp màn hình) bằng trình xem của M Photo
 
 ### Cải thiện
-- Ô ảnh trong thư mục cùng cỡ với ô Album
-- Thoát trình xem thì lưới cuộn tới đúng ảnh vừa xem
-
-### Sửa lỗi
-- Sửa lỗi lưới ảnh trong thư mục bị nhảy về đầu khi bấm back ra rồi vào lại
+- Mở từ app khác: vuốt xem được các ảnh cùng thư mục, bấm back là quay lại app trước đó
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).

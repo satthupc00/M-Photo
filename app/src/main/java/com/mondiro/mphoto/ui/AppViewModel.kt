@@ -43,6 +43,8 @@ class Node(
 data class ViewerState(val folder: String, val index: Int)
 data class PickerReq(val items: List<MediaItem>, val move: Boolean, val defaultNew: String? = null)
 class PermReq(val sender: android.content.IntentSender, val onGranted: () -> Unit)
+const val EXTERNAL = "Mở từ app khác"
+
 data class ToastMsg(val text: String, val id: Long = System.nanoTime())
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -110,7 +112,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun isExcluded(p: String) = Rules.isExcluded(p, userRules, sysOff, autoExclude)
 
     val visible: List<Folder> by derivedStateOf {
-        folders.values.filter { !isExcluded(it.path) && (showHidden || !isHidden(it.path)) }
+        folders.values.filter { it.path != EXTERNAL && !isExcluded(it.path) && (showHidden || !isHidden(it.path)) }
             .sortedWith(compareByDescending<Folder> { it.path in pinned }.thenByDescending { it.latest })
     }
     val excluded: List<Folder> by derivedStateOf {
@@ -201,6 +203,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Ghép album chuyến đi (ảnh/video chụp bằng máy trong khoảng thời gian chuyến đi) vào danh sách thư mục. */
     private fun rebuildFolders() {
         val all = raw.toMutableMap()
+        externalFolder?.let { all[it.path] = it }
         if (trips.isNotEmpty()) {
             val cam = raw.values.filter { it.path.startsWith("DCIM", true) && !it.path.contains("screen", true) }.flatMap { it.items }
             for (t in trips) {
@@ -249,6 +252,47 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val items = folders[t.key]?.items.orEmpty()
         if (items.isEmpty()) { toast("Chuyến đi chưa có ảnh nào"); return }
         picker = PickerReq(items, move, defaultNew = "Pictures/${t.name}")
+    }
+
+    // ---------------- mở từ app khác ----------------
+    /** Ảnh/video mở từ app khác mà thư viện không có (vd file của app khác chia sẻ). */
+    private var externalFolder: Folder? = null
+    /** Đang xem ảnh mở từ app khác: đóng trình xem là quay lại app đó. */
+    var externalViewing by mutableStateOf(false)
+
+    fun openUri(uri: android.net.Uri, type: String?) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            // 1. Ảnh trong thư viện (vd ảnh chụp màn hình vừa lưu): mở đúng thư mục để vuốt qua ảnh khác được
+            val id = if (uri.authority == MediaStore.AUTHORITY) try { android.content.ContentUris.parseId(uri) } catch (_: Exception) { -1L } else -1L
+            if (id > 0 && hasPermission) {
+                try { raw = MediaRepository.load(ctx); rebuildFolders() } catch (_: Exception) {}
+                for (f in folders.values) {
+                    if (f.path.startsWith("Chuyến đi/")) continue
+                    val i = f.items.indexOfFirst { it.id == id }
+                    if (i >= 0) { viewer = ViewerState(f.path, i); externalViewing = true; return@launch }
+                }
+            }
+            // 2. Không có trong thư viện: xem riêng file đó
+            val item = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                var name = uri.lastPathSegment ?: "file"
+                var size = 0L
+                try {
+                    ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) { c.getString(0)?.let { name = it }; size = c.getLong(1) }
+                    }
+                } catch (_: Exception) {}
+                val mime = type ?: ctx.contentResolver.getType(uri) ?: "image/*"
+                MediaItem(
+                    id = uri.hashCode().toLong(), uri = uri, folder = EXTERNAL, name = name, date = System.currentTimeMillis(),
+                    isVideo = mime.startsWith("video"), duration = 0, mime = mime, size = size, width = 0, height = 0,
+                )
+            }
+            externalFolder = Folder(EXTERNAL, listOf(item))
+            rebuildFolders()
+            viewer = ViewerState(EXTERNAL, 0)
+            externalViewing = true
+        }
     }
 
     override fun onCleared() {
