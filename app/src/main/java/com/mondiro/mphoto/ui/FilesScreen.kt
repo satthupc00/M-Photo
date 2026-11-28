@@ -439,7 +439,8 @@ private fun RenameDialog(vm: AppViewModel, e: FileEntry) {
 @Composable
 private fun DestPicker(vm: AppViewModel, e: FileEntry, move: Boolean) {
     val fm = vm.files
-    var dir by remember(e.path) { mutableStateOf(if (fm.segment == "browse") fm.cwd else Files.root) }
+    var dir by remember(e.path) { mutableStateOf(fm.pickerStart ?: if (fm.segment == "browse") fm.cwd else Files.root) }
+    LaunchedEffect(Unit) { fm.pickerStart = null }
     var newName by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
     val subdirs by produceState(emptyList<FileEntry>(), dir, reload) {

@@ -256,6 +256,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         picker = PickerReq(items, move, defaultNew = "Pictures/${t.name}")
     }
 
+    // ---------------- di chuyển / đổi tên thư mục ----------------
+    /** Thư mục trong thư viện (bộ nhớ trong) dưới dạng file để di chuyển / đổi tên; null nếu không làm được. */
+    fun folderEntry(path: String): com.mondiro.mphoto.data.FileEntry? {
+        if (path == EXTERNAL || path.startsWith("Thẻ nhớ") || tripOf(path) != null || path == "Bộ nhớ trong") return null
+        val f = java.io.File(com.mondiro.mphoto.data.Files.root, path)
+        if (!f.isDirectory) return null
+        return com.mondiro.mphoto.data.FileEntry(f.absolutePath, f.name, true, 0, f.lastModified(), children = f.list()?.size ?: 0)
+    }
+
+    /** Sau khi chuyển / đổi tên thư mục: giữ nguyên ghim, ẩn, sync, loại trừ theo đường dẫn mới. */
+    fun remapPaths(old: String, new: String) {
+        if (old.isEmpty() || old == new) return
+        fun m(p: String) = if (p == old) new else if (p.startsWith("$old/")) new + p.removePrefix(old) else p
+        pinned = pinned.map(::m).toSet(); prefs.pinned = pinned
+        hidden = hidden.map(::m).toSet(); prefs.hidden = hidden
+        gsync = gsync.map(::m).toSet(); prefs.gsync = gsync
+        userRules = userRules.map { it.copy(pattern = m(it.pattern)) }; prefs.rules = userRules
+        openFolder = openFolder?.let(::m)
+        if (path.isNotEmpty()) path = m(path.joinToString("/")).split('/')
+    }
+
     // ---------------- sửa ảnh ----------------
     /** Ảnh đang mở trong màn hình Sửa ảnh. */
     var editing by mutableStateOf<MediaItem?>(null)

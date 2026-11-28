@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FlightLand
@@ -190,6 +191,12 @@ fun FolderSheet(vm: AppViewModel, path: String, wide: Boolean) {
                     Action(Icons.Outlined.CloudUpload, "Sync lên Google Photos", if (path in vm.gsync) "Đang đánh dấu sync · chạm để xem" else "Mở cài đặt sao lưu thư mục", tint = if (path in vm.gsync) Mc.green else Mc.text) {
                         vm.sheetFolder = null; vm.dialog = "gp:$path"
                     }
+                    Action(Icons.AutoMirrored.Outlined.DriveFileMove, "Di chuyển thư mục tới…", "Chuyển cả thư mục sang chỗ khác") {
+                        vm.sheetFolder = null; folderFileAction(vm, path, "move")
+                    }
+                    Action(Icons.Outlined.DriveFileRenameOutline, "Đổi tên thư mục", path.substringAfterLast('/')) {
+                        vm.sheetFolder = null; folderFileAction(vm, path, "rename")
+                    }
                     Action(Icons.Outlined.Block, "Loại trừ khỏi thư viện", "Không hiện thư mục này nữa", tint = Mc.redSoft) {
                         vm.sheetFolder = null; vm.excludeFolder(path)
                     }
@@ -197,6 +204,21 @@ fun FolderSheet(vm: AppViewModel, path: String, wide: Boolean) {
             }
         }
     }
+}
+
+/** Mở hộp thoại Di chuyển / Đổi tên của tab File cho 1 thư mục trong thư viện. */
+private fun folderFileAction(vm: AppViewModel, path: String, dialog: String) {
+    val fm = vm.files
+    fm.checkPermission()
+    if (!fm.granted) {
+        vm.toast("Cần bật quyền \"truy cập tất cả file\" trước (trong tab File)")
+        vm.selectTab(Tab.Files)
+        return
+    }
+    val e = vm.folderEntry(path) ?: run { vm.toast("Không di chuyển / đổi tên được thư mục này"); return }
+    fm.pickerStart = e.file.parentFile
+    fm.dialogTarget = e
+    fm.dialog = dialog
 }
 
 @Composable

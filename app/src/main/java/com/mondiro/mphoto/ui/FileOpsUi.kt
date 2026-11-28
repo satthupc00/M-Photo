@@ -182,20 +182,31 @@ private fun DestinationPicker(vm: AppViewModel, req: PickerReq) {
     BackHandler { vm.picker = null }
     val anyVideo = req.items.any { it.isVideo }
     val from = req.items.map { it.folder }.toSet()
-    var newPath by remember { mutableStateOf<String?>(null) }
+    // Tạo thư mục mới: chọn nơi tạo (parent) rồi chỉ gõ tên
+    var creating by remember { mutableStateOf(false) }
+    var parent by remember { mutableStateOf(req.defaultNew?.substringBeforeLast('/', "Pictures") ?: "Pictures") }
+    var name by remember { mutableStateOf(req.defaultNew?.substringAfterLast('/') ?: "") }
+    var choosingParent by remember { mutableStateOf(false) }
     val targets = remember(vm.folders) {
         vm.visible.map { it.path }.filter { p -> p !in from && req.items.all { FileOps.canPlace(p, it.isVideo) } }.sortedBy { it.lowercase() }
     }
+    val parents = remember(vm.folders) {
+        (FileOps.allowedTops(anyVideo) + vm.visible.map { it.path })
+            .filter { p -> req.items.all { FileOps.canPlace(p, it.isVideo) } }
+            .distinct().sortedBy { it.lowercase() }
+    }
+    val cleanName = name.trim()
+    val nameOk = cleanName.isNotEmpty() && !cleanName.contains('/')
     val verb = if (req.move) "Di chuyển" else "Copy"
     AlertDialog(
         onDismissRequest = { vm.picker = null },
         containerColor = Mc.panel,
-        title = { Text("$verb ${req.items.size} mục tới…", fontWeight = FontWeight.Bold) },
+        title = { Text(if (creating) "Thư mục mới" else "$verb ${req.items.size} mục tới…", fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                if (newPath == null) {
+                if (!creating) {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable { newPath = req.defaultNew ?: "Pictures/" }.padding(vertical = 10.dp, horizontal = 6.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable { creating = true }.padding(vertical = 10.dp, horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Outlined.CreateNewFolder, null, tint = Mc.red)
@@ -218,30 +229,50 @@ private fun DestinationPicker(vm: AppViewModel, req: PickerReq) {
                         }
                     }
                 } else {
-                    Text(
-                        "Nhập đường dẫn thư mục. Android chỉ cho lưu " + (if (anyVideo) "video vào DCIM, Movies, Pictures, Download." else "ảnh vào DCIM, Pictures, Download."),
-                        color = Mc.muted, fontSize = 13.sp,
-                    )
-                    Spacer(Modifier.height(10.dp))
+                    Text("Tạo trong", color = Mc.muted, fontSize = 12.sp)
+                    // Nơi tạo: bấm để chọn thư mục khác
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 4.dp).clip(RoundedCornerShape(12.dp)).background(Mc.chrome)
+                            .pressable { choosingParent = !choosingParent }.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.Folder, null, tint = Mc.star, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("/$parent", color = Mc.text, fontFamily = FontFamily.Monospace, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text(if (choosingParent) "Xong" else "Đổi", color = Mc.red, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    if (choosingParent) LazyColumn(Modifier.heightIn(max = 260.dp).padding(top = 4.dp)) {
+                        items(parents, key = { it }) { p ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (p == parent) Mc.selected else Color.Transparent)
+                                    .pressable { parent = p; choosingParent = false }.padding(vertical = 8.dp, horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Outlined.Folder, null, tint = Mc.star, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text("/$p", color = Mc.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = newPath!!, onValueChange = { newPath = it }, singleLine = true,
-                        textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, color = Mc.text),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Mc.red, unfocusedBorderColor = Mc.line, cursorColor = Mc.red),
+                        value = name, onValueChange = { name = it.replace("/", "") }, singleLine = true,
+                        label = { Text("Tên thư mục mới") },
+                        textStyle = TextStyle(fontSize = 15.sp, color = Mc.text),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Mc.red, unfocusedBorderColor = Mc.line, cursorColor = Mc.red, focusedLabelColor = Mc.red),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    val ok = newPath!!.trim('/').contains('/') || newPath!!.trim('/').isNotEmpty()
-                    val valid = ok && req.items.all { FileOps.canPlace(newPath!!, it.isVideo) }
-                    if (!valid && newPath!!.isNotBlank()) Text("Thư mục gốc phải là " + FileOps.allowedTops(anyVideo).joinToString(", "), color = Mc.redSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (nameOk) Text("Sẽ tạo: /$parent/$cleanName", color = Mc.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 6.dp))
                 }
             }
         },
         confirmButton = {
-            if (newPath != null) TextButton({ vm.performCopyMove(req, newPath!!) }, enabled = req.items.all { FileOps.canPlace(newPath!!, it.isVideo) } && newPath!!.trim('/').isNotEmpty()) {
-                Text(verb, color = Mc.red, fontWeight = FontWeight.Bold)
+            if (creating) TextButton({ vm.performCopyMove(req, "$parent/$cleanName") }, enabled = nameOk) {
+                Text("Tạo & $verb", color = Mc.red, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton({ if (newPath != null) newPath = null else vm.picker = null }) { Text(if (newPath != null) "Quay lại" else "Huỷ", color = Mc.muted) }
+            TextButton({ if (creating) creating = false else vm.picker = null }) { Text(if (creating) "Quay lại" else "Huỷ", color = Mc.muted) }
         },
     )
 }

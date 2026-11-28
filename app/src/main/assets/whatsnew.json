@@ -1,6 +1,11 @@
-{ "version": "1.8.2", "date": "2026-11-28",
+{ "version": "1.9.0", "date": "2026-11-28",
   "new": [
-    "Chọn nhanh cả dãy: đang chọn ảnh A, giữ lâu ảnh B là tự chọn hết các ảnh từ A tới B"
+    "Di chuyển thư mục và đổi tên thư mục ngay trong Album / Thư mục (giữ lâu thư mục để mở menu)",
+    "Ghim, ẩn, sync, loại trừ của thư mục được giữ nguyên sau khi di chuyển / đổi tên"
   ],
-  "improved": [],
-  "fixed": [] }
+  "improved": [
+    "Tạo thư mục mới khi copy / di chuyển ảnh: chọn nơi tạo trước, rồi chỉ cần gõ tên thư mục"
+  ],
+  "fixed": [
+    "Di chuyển / đổi tên thư mục trong tab File không còn để lại ảnh \"ma\" ở chỗ cũ"
+  ] }

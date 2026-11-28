@@ -38,6 +38,8 @@ class FilesModel(private val app: Application, private val scope: CoroutineScope
     /** Hộp thoại: "rename", "delete", "info", "copy", "move". */
     var dialog by mutableStateOf<String?>(null)
     var dialogTarget by mutableStateOf<FileEntry?>(null)
+    /** Thư mục bắt đầu của hộp chọn nơi đến (null = theo vị trí đang duyệt). */
+    var pickerStart by mutableStateOf<File?>(null)
 
     private val listStates = HashMap<String, LazyListState>()
     fun listState(key: String): LazyListState = listStates.getOrPut(key) { LazyListState() }
@@ -113,9 +115,13 @@ class FilesModel(private val app: Application, private val scope: CoroutineScope
 
     fun rename(e: FileEntry, newName: String) = scope.launch {
         try {
+            val old = if (e.isDir) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                e.file.walkTopDown().take(5000).map { it.absolutePath }.toList()
+            } else listOf(e.path)
             val t = Files.rename(e.file, newName)
             vm.toast("Đã đổi tên")
-            afterChange(listOf(e.path, t.absolutePath))
+            if (e.isDir) vm.remapPaths(Files.rel(e.path), Files.rel(t.absolutePath))
+            afterChange(old + t.absolutePath)
         } catch (ex: Exception) { vm.toast("Không đổi tên được: ${ex.message}") }
     }
 
@@ -128,9 +134,14 @@ class FilesModel(private val app: Application, private val scope: CoroutineScope
     fun copyMove(e: FileEntry, dest: File, move: Boolean) = scope.launch {
         vm.busy = if (move) "Đang di chuyển…" else "Đang chép…"
         try {
+            // Nhớ đường dẫn cũ của từng file để Android xoá chỉ mục cũ sau khi chuyển
+            val old = if (move) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                e.file.walkTopDown().take(5000).map { it.absolutePath }.toList()
+            } else emptyList()
             val t = if (move) Files.move(e.file, dest) else Files.copy(e.file, dest)
             vm.toast((if (move) "Đã di chuyển" else "Đã chép") + " vào " + dest.name.ifEmpty { "Bộ nhớ trong" })
-            afterChange(listOfNotNull(if (move) e.path else null, t.absolutePath))
+            if (move && e.isDir) vm.remapPaths(Files.rel(e.path), Files.rel(t.absolutePath))
+            afterChange(old + t.absolutePath)
         } catch (ex: Exception) {
             vm.toast((if (move) "Không di chuyển được: " else "Không chép được: ") + ex.message)
         }
