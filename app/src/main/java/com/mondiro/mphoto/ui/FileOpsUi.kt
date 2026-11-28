@@ -78,7 +78,7 @@ fun GridThumb(vm: AppViewModel, folder: String, item: MediaItem, index: Int) {
         Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .pressable(onLongClick = { vm.toggleSelect(folder, item.id) }) {
+            .pressable(onLongClick = { vm.selectRangeTo(folder, item.id) }) {
                 if (selecting) vm.toggleSelect(folder, item.id) else vm.viewer = ViewerState(folder, index)
             },
     ) {

@@ -26,6 +26,8 @@ import com.mondiro.mphoto.update.Updater
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.max
+import kotlin.math.min
 
 enum class Tab { Album, Folder, Files, Settings }
 
@@ -550,15 +552,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var permissionRequest by mutableStateOf<PermReq?>(null)
     var busy by mutableStateOf<String?>(null)
 
+    /** Ảnh chọn gần nhất: mốc để giữ lâu ảnh khác chọn cả dãy. */
+    private var selectionAnchor: Long? = null
+
     fun toggleSelect(folder: String, id: Long) {
         if (selectionFolder != folder) { selection = emptySet(); selectionFolder = folder }
         selection = if (id in selection) selection - id else selection + id
+        selectionAnchor = if (id in selection) id else selection.lastOrNull()
+    }
+
+    /**
+     * Giữ lâu khi đang chọn: chọn tất cả ảnh từ ảnh chọn gần nhất (A) tới ảnh vừa giữ (B).
+     * Chưa chọn gì thì giữ lâu = bắt đầu chọn như cũ.
+     */
+    fun selectRangeTo(folder: String, id: Long) {
+        val f = folders[folder]
+        val anchor = selectionAnchor
+        if (f == null || selection.isEmpty() || selectionFolder != folder || anchor == null) { toggleSelect(folder, id); return }
+        val a = f.items.indexOfFirst { it.id == anchor }
+        val b = f.items.indexOfFirst { it.id == id }
+        if (a < 0 || b < 0 || a == b) { toggleSelect(folder, id); return }
+        val before = selection.size
+        selection = selection + f.items.subList(min(a, b), max(a, b) + 1).map { it.id }
+        selectionAnchor = id
+        toast("Đã chọn thêm ${selection.size - before} mục · tổng ${selection.size}")
     }
     fun selectAll(f: Folder) {
         selectionFolder = f.path
         selection = if (selection.size == f.count) emptySet() else f.items.map { it.id }.toSet()
     }
-    fun clearSelection() { selection = emptySet(); selectionFolder = null }
+    fun clearSelection() { selection = emptySet(); selectionFolder = null; selectionAnchor = null }
     fun selectedItems(): List<MediaItem> = folders[selectionFolder]?.items?.filter { it.id in selection }.orEmpty()
 
     fun requestDelete(items: List<MediaItem>) {
