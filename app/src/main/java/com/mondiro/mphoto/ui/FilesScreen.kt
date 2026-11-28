@@ -439,7 +439,9 @@ private fun RenameDialog(vm: AppViewModel, e: FileEntry) {
 @Composable
 private fun DestPicker(vm: AppViewModel, e: FileEntry, move: Boolean) {
     val fm = vm.files
-    var dir by remember(e.path) { mutableStateOf(fm.pickerStart ?: if (fm.segment == "browse") fm.cwd else Files.root) }
+    var dir by remember(e.path) {
+        mutableStateOf(vm.lastDest?.takeIf { it.isDirectory && it.absolutePath != e.path } ?: fm.pickerStart ?: if (fm.segment == "browse") fm.cwd else Files.root)
+    }
     LaunchedEffect(Unit) { fm.pickerStart = null }
     var newName by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
@@ -492,7 +494,7 @@ private fun DestPicker(vm: AppViewModel, e: FileEntry, move: Boolean) {
                 }
             }
         },
-        confirmButton = { TextButton({ fm.dialog = null; fm.copyMove(e, dir, move) }) { Text("$verb vào đây", color = Mc.red, fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton({ fm.dialog = null; vm.lastDest = dir; fm.copyMove(e, dir, move) }) { Text("$verb vào đây", color = Mc.red, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton({ fm.dialog = null }) { Text("Huỷ", color = Mc.muted) } },
     )
 }

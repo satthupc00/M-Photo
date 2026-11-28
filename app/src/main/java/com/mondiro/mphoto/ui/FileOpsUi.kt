@@ -290,7 +290,13 @@ private fun BrowseDestPicker(vm: AppViewModel, req: PickerReq) {
     val startRel = req.defaultNew?.substringBeforeLast('/', "")
         ?: req.items.firstOrNull()?.folder?.takeIf { it != "Bộ nhớ trong" && !it.startsWith("Thẻ nhớ") }?.substringBeforeLast('/', "")
         ?: ""
-    var dir by remember { mutableStateOf(java.io.File(root, startRel).takeIf { it.isDirectory } ?: root) }
+    // Mở sẵn thư mục chọn lần trước (nếu còn), không thì theo vị trí ảnh
+    var dir by remember {
+        mutableStateOf(
+            (if (req.defaultNew == null) vm.lastDest?.takeIf { it.isDirectory } else null)
+                ?: java.io.File(root, startRel).takeIf { it.isDirectory } ?: root
+        )
+    }
     var newName by remember { mutableStateOf<String?>(req.defaultNew?.substringAfterLast('/')) }
     var reload by remember { mutableStateOf(0) }
     val subdirs by androidx.compose.runtime.produceState(emptyList<com.mondiro.mphoto.data.FileEntry>(), dir, reload) {
@@ -350,7 +356,7 @@ private fun BrowseDestPicker(vm: AppViewModel, req: PickerReq) {
                 }
             }
         },
-        confirmButton = { TextButton({ vm.performCopyMove(req, rel) }) { Text("$verb vào đây", color = Mc.red, fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton({ vm.lastDest = dir; vm.performCopyMove(req, rel) }) { Text("$verb vào đây", color = Mc.red, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton({ vm.picker = null }) { Text("Huỷ", color = Mc.muted) } },
     )
 }

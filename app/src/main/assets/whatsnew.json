@@ -1,8 +1,6 @@
-{ "version": "1.9.1", "date": "2026-11-28",
+{ "version": "1.9.2", "date": "2026-11-28",
   "new": [],
   "improved": [
-    "Copy / Di chuyển ảnh, video tới bất kỳ thư mục nào trong Bộ nhớ trong (không còn giới hạn DCIM, Pictures, Download) khi đã bật quyền truy cập tất cả file",
-    "Chọn nơi đến bằng cách duyệt từng thư mục, tạo thư mục mới ở bất kỳ đâu chỉ cần gõ tên",
-    "Di chuyển không cần bấm cho phép từng lần nữa"
+    "Copy / Di chuyển nhớ thư mục chọn lần trước: mở hộp chọn là đứng sẵn ở đó (đóng hẳn app thì quên)"
   ],
   "fixed": [] }

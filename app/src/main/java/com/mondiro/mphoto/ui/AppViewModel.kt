@@ -256,6 +256,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         picker = PickerReq(items, move, defaultNew = "Pictures/${t.name}")
     }
 
+    /** Thư mục chọn làm nơi đến lần trước (copy / di chuyển). Chỉ nhớ khi app còn chạy, đóng hẳn app thì quên. */
+    var lastDest: java.io.File? = null
+
     // ---------------- di chuyển / đổi tên thư mục ----------------
     /** Thư mục trong thư viện (bộ nhớ trong) dưới dạng file để di chuyển / đổi tên; null nếu không làm được. */
     fun folderEntry(path: String): com.mondiro.mphoto.data.FileEntry? {
