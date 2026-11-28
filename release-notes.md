@@ -1,13 +1,8 @@
-## M Photo v1.9.0 · 28/11/2026
-
-### Mới
-- Di chuyển thư mục và đổi tên thư mục ngay trong Album / Thư mục (giữ lâu thư mục để mở menu)
-- Ghim, ẩn, sync, loại trừ của thư mục được giữ nguyên sau khi di chuyển / đổi tên
+## M Photo v1.9.1 · 28/11/2026
 
 ### Cải thiện
-- Tạo thư mục mới khi copy / di chuyển ảnh: chọn nơi tạo trước, rồi chỉ cần gõ tên thư mục
-
-### Sửa lỗi
-- Di chuyển / đổi tên thư mục trong tab File không còn để lại ảnh "ma" ở chỗ cũ
+- Copy / Di chuyển ảnh, video tới bất kỳ thư mục nào trong Bộ nhớ trong (không còn giới hạn DCIM, Pictures, Download) khi đã bật quyền truy cập tất cả file
+- Chọn nơi đến bằng cách duyệt từng thư mục, tạo thư mục mới ở bất kỳ đâu chỉ cần gõ tên
+- Di chuyển không cần bấm cho phép từng lần nữa
 
 **Cập nhật:** mở M Photo › bấm nút cập nhật (mũi tên xoay).

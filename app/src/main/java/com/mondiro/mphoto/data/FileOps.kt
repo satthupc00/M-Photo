@@ -35,7 +35,29 @@ object FileOps {
         else -> MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
     }
 
-    suspend fun copy(context: Context, item: MediaItem, dest: String): Uri = withContext(Dispatchers.IO) {
+    /** Đường dẫn thật của file trong bộ nhớ (cần quyền truy cập tất cả file). */
+    private fun pathOf(context: Context, item: MediaItem): String? = try {
+        context.contentResolver.query(item.uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (_: Exception) { null }
+
+    /** Có quyền truy cập tất cả file: chép / chuyển thẳng bằng file, tới mọi thư mục trong Bộ nhớ trong. */
+    private suspend fun viaFile(context: Context, item: MediaItem, dest: String, move: Boolean): Boolean {
+        if (!Files.hasAllFilesAccess()) return false
+        val p = pathOf(context, item) ?: return false
+        val src = java.io.File(p)
+        if (!src.exists()) return false
+        val dir = java.io.File(Files.root, dest.trim('/'))
+        withContext(Dispatchers.IO) { dir.mkdirs() }
+        if (!dir.isDirectory) throw IllegalStateException("không tạo được thư mục")
+        val t = if (move) Files.move(src, dir) else Files.copy(src, dir)
+        Files.scan(context, listOfNotNull(if (move) p else null, t.absolutePath))
+        return true
+    }
+
+    suspend fun copy(context: Context, item: MediaItem, dest: String): Uri? = withContext(Dispatchers.IO) {
+        if (viaFile(context, item, dest, move = false)) return@withContext null
         val r = context.contentResolver
         val d = normalize(dest)
         val values = ContentValues().apply {
@@ -58,6 +80,7 @@ object FileOps {
 
     /** Cần quyền ghi (createWriteRequest) cho item trước khi gọi. */
     suspend fun move(context: Context, item: MediaItem, dest: String) = withContext(Dispatchers.IO) {
+        if (viaFile(context, item, dest, move = true)) return@withContext
         val r = context.contentResolver
         val d = normalize(dest)
         val sameCollection = !d.startsWith("Download")
@@ -70,5 +93,6 @@ object FileOps {
         // Khác loại thư mục (vd vào Download): chép sang rồi xoá bản gốc
         copy(context, item, d)
         r.delete(item.uri, null, null)
+        Unit
     }
 }

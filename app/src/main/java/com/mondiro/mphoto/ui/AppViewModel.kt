@@ -622,13 +622,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun performCopyMove(req: PickerReq, destRaw: String) {
         picker = null
-        val dest = com.mondiro.mphoto.data.FileOps.normalize(destRaw)
-        val bad = req.items.filter { !com.mondiro.mphoto.data.FileOps.canPlace(dest, it.isVideo) }
-        if (dest.isEmpty() || bad.isNotEmpty()) {
+        // Có quyền truy cập tất cả file: chép / chuyển tới bất kỳ thư mục nào trong Bộ nhớ trong
+        val allFiles = com.mondiro.mphoto.data.Files.hasAllFilesAccess()
+        val dest = if (allFiles) destRaw.trim().trim('/') else com.mondiro.mphoto.data.FileOps.normalize(destRaw)
+        val bad = if (allFiles) emptyList() else req.items.filter { !com.mondiro.mphoto.data.FileOps.canPlace(dest, it.isVideo) }
+        if ((!allFiles && dest.isEmpty()) || bad.isNotEmpty()) {
             toast(if (bad.any { it.isVideo }) "Video chỉ chép được vào DCIM, Movies, Pictures, Download" else "Ảnh chỉ chép được vào DCIM, Pictures, Download")
             return
         }
-        val items = req.items.filter { it.folder != dest }
+        val items = req.items.filter { it.folder != dest.ifEmpty { "Bộ nhớ trong" } }
         if (items.isEmpty()) { toast("Đã ở sẵn trong thư mục này"); return }
         val run: () -> Unit = {
             viewModelScope.launch {
@@ -645,10 +647,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 clearSelection()
                 reload()
                 val verb = if (req.move) "di chuyển" else "chép"
-                toast(if (fail == 0) "Đã $verb $ok mục vào ${dest.substringAfterLast('/')}" else "Đã $verb $ok mục, lỗi $fail mục")
+                toast(if (fail == 0) "Đã $verb $ok mục vào ${dest.substringAfterLast('/').ifEmpty { "Bộ nhớ trong" }}" else "Đã $verb $ok mục, lỗi $fail mục")
             }
         }
-        if (req.move) {
+        if (req.move && !allFiles) {
             try {
                 val pi = MediaStore.createWriteRequest(getApplication<Application>().contentResolver, items.map { it.uri })
                 permissionRequest = PermReq(pi.intentSender, run)

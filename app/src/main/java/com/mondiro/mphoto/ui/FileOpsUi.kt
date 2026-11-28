@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -179,6 +180,7 @@ fun FileOpsHost(vm: AppViewModel) {
 
 @Composable
 private fun DestinationPicker(vm: AppViewModel, req: PickerReq) {
+    if (com.mondiro.mphoto.data.Files.hasAllFilesAccess()) { BrowseDestPicker(vm, req); return }
     BackHandler { vm.picker = null }
     val anyVideo = req.items.any { it.isVideo }
     val from = req.items.map { it.folder }.toSet()
@@ -274,5 +276,81 @@ private fun DestinationPicker(vm: AppViewModel, req: PickerReq) {
         dismissButton = {
             TextButton({ if (creating) creating = false else vm.picker = null }) { Text(if (creating) "Quay lại" else "Huỷ", color = Mc.muted) }
         },
+    )
+}
+
+/**
+ * Chọn nơi đến khi đã có quyền truy cập tất cả file: duyệt từng thư mục trong Bộ nhớ trong,
+ * tạo thư mục mới (chỉ gõ tên) ở bất kỳ đâu, rồi bấm "… vào đây".
+ */
+@Composable
+private fun BrowseDestPicker(vm: AppViewModel, req: PickerReq) {
+    BackHandler { vm.picker = null }
+    val root = com.mondiro.mphoto.data.Files.root
+    val startRel = req.defaultNew?.substringBeforeLast('/', "")
+        ?: req.items.firstOrNull()?.folder?.takeIf { it != "Bộ nhớ trong" && !it.startsWith("Thẻ nhớ") }?.substringBeforeLast('/', "")
+        ?: ""
+    var dir by remember { mutableStateOf(java.io.File(root, startRel).takeIf { it.isDirectory } ?: root) }
+    var newName by remember { mutableStateOf<String?>(req.defaultNew?.substringAfterLast('/')) }
+    var reload by remember { mutableStateOf(0) }
+    val subdirs by androidx.compose.runtime.produceState(emptyList<com.mondiro.mphoto.data.FileEntry>(), dir, reload) {
+        value = try {
+            com.mondiro.mphoto.data.Files.list(dir, false).filter { it.isDir && !(it.path.contains("/Android/data") || it.path.contains("/Android/obb")) }.sortedBy { it.name.lowercase() }
+        } catch (_: Exception) { emptyList() }
+    }
+    val rel = com.mondiro.mphoto.data.Files.rel(dir.absolutePath)
+    val atRoot = dir.absolutePath == root.absolutePath
+    val verb = if (req.move) "Di chuyển" else "Copy"
+    AlertDialog(
+        onDismissRequest = { vm.picker = null },
+        containerColor = Mc.panel,
+        title = { Text("$verb ${req.items.size} mục tới…", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!atRoot) IconBtn(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, "Lên 1 cấp", modifier = Modifier.size(38.dp)) { dir = dir.parentFile ?: root }
+                    Text("/" + rel.ifEmpty { "Bộ nhớ trong" }, color = Mc.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                }
+                if (newName == null) Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable { newName = "" }.padding(vertical = 10.dp, horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.CreateNewFolder, null, tint = Mc.red)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Thư mục mới ở đây…", color = Mc.red, fontWeight = FontWeight.Bold)
+                } else Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
+                    OutlinedTextField(
+                        value = newName!!, onValueChange = { newName = it.replace("/", "") }, singleLine = true,
+                        label = { Text("Tên thư mục mới") },
+                        textStyle = TextStyle(fontSize = 14.sp, color = Mc.text),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Mc.red, unfocusedBorderColor = Mc.line, cursorColor = Mc.red, focusedLabelColor = Mc.red),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton({
+                        val n = newName!!.trim()
+                        val f = java.io.File(dir, n)
+                        if (n.isNotEmpty() && (f.isDirectory || f.mkdirs())) { dir = f; newName = null; reload++ } else vm.toast("Không tạo được thư mục")
+                    }, enabled = newName!!.isNotBlank()) { Text("Tạo", color = Mc.red, fontWeight = FontWeight.Bold) }
+                }
+                LazyColumn(Modifier.heightIn(max = 340.dp)) {
+                    items(subdirs, key = { it.path }) { d ->
+                        val relD = com.mondiro.mphoto.data.Files.rel(d.path)
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable { dir = d.file }.padding(vertical = 8.dp, horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val cover = vm.folders[relD]?.cover
+                            if (cover != null) Thumb(cover, Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)), showVideo = false)
+                            else Icon(Icons.Outlined.Folder, null, tint = Mc.star, modifier = Modifier.size(34.dp).padding(5.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text(d.name, color = Mc.text, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            Text("${d.children}", color = Mc.muted, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton({ vm.performCopyMove(req, rel) }) { Text("$verb vào đây", color = Mc.red, fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton({ vm.picker = null }) { Text("Huỷ", color = Mc.muted) } },
     )
 }
